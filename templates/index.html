@@ -539,7 +539,12 @@
                                         
                                         <div>
                                             <h4 className="font-semibold text-gray-800">Keywords:</h4>
-                                            <p className="text-gray-600">{mode === 'ai' ? generatedListing?.keywords?.join(', ') : manualListing.keywords.join(', ')}</p>
+                                            <p className="text-gray-600">
+                                                {mode === 'ai' 
+                                                    ? (Array.isArray(generatedListing?.keywords) ? generatedListing.keywords.join(', ') : (generatedListing?.keywords || ''))
+                                                    : (Array.isArray(manualListing.keywords) ? manualListing.keywords.join(', ') : '')
+                                                }
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
