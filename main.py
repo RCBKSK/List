@@ -29,23 +29,33 @@ def index():
 @app.route('/api/generate-listing', methods=['POST'])
 def generate_listing():
     try:
+        print("Starting generate_listing...")
         data = request.get_json()
+        print(f"Received data keys: {data.keys() if data else 'No data'}")
         
         if not genai_api_key:
+            print("Error: Gemini API key not configured")
             return jsonify({'error': 'Gemini API key not configured'}), 400
         
         # Get image data
         image_data = data.get('image')
         if not image_data:
+            print("Error: No image provided")
             return jsonify({'error': 'No image provided'}), 400
         
+        print("Processing image data...")
         # Remove data URL prefix if present
         if 'base64,' in image_data:
             image_data = image_data.split('base64,')[1]
         
         # Decode base64 image
-        image_bytes = base64.b64decode(image_data)
-        image = Image.open(io.BytesIO(image_bytes))
+        try:
+            image_bytes = base64.b64decode(image_data)
+            image = Image.open(io.BytesIO(image_bytes))
+            print(f"Image loaded successfully: {image.size}")
+        except Exception as img_error:
+            print(f"Image processing error: {img_error}")
+            return jsonify({'error': f'Image processing failed: {str(img_error)}'}), 400
         
         # Get additional product info
         product_info = data.get('productInfo', {})
@@ -53,6 +63,7 @@ def generate_listing():
         brand = product_info.get('brand', '')
         dimensions = product_info.get('dimensions', '')
         cost_price = product_info.get('costPrice', 0)
+        print(f"Product info: name={product_name}, brand={brand}")
         
         # Create prompt for Gemini
         prompt = f"""
@@ -78,13 +89,22 @@ def generate_listing():
         """
         
         # Generate content with Gemini Vision
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content([prompt, image])
+        try:
+            print("Calling Gemini API...")
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            response = model.generate_content([prompt, image])
+            print("Gemini API call successful")
+        except Exception as api_error:
+            print(f"Gemini API error: {api_error}")
+            return jsonify({'error': f'Gemini API call failed: {str(api_error)}'}), 500
         
         # Parse the response
         try:
+            print("Parsing Gemini response...")
             # Extract JSON from response
             response_text = response.text
+            print(f"Raw response: {response_text[:200]}...")
+            
             if '```json' in response_text:
                 json_start = response_text.find('```json') + 7
                 json_end = response_text.find('```', json_start)
@@ -95,7 +115,9 @@ def generate_listing():
                 response_text = response_text[json_start:json_end]
             
             listing_data = json.loads(response_text)
-        except:
+            print("JSON parsing successful")
+        except Exception as parse_error:
+            print(f"JSON parsing error: {parse_error}")
             # Fallback if JSON parsing fails
             listing_data = {
                 "title": f"{brand} {product_name}".strip() or "Product Title",
@@ -109,10 +131,15 @@ def generate_listing():
                 "hsnCode": "9999",
                 "keywords": ["quality", "durable", "reliable"]
             }
+            print("Using fallback listing data")
         
+        print("Returning successful response")
         return jsonify({'success': True, 'data': listing_data})
         
     except Exception as e:
+        print(f"Unexpected error in generate_listing: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/calculate-price', methods=['POST'])
