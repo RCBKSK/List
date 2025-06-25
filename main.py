@@ -29,15 +29,18 @@ def configure_gemini(api_key):
 def scrape_product_data(url):
     """Scrape product dimensions and weight from e-commerce URLs"""
     try:
+        print(f"Scraping URL: {url}")
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
         
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
+        print(f"Response status: {response.status_code}")
         
         soup = BeautifulSoup(response.content, 'html.parser')
         domain = urlparse(url).netloc.lower()
+        print(f"Domain detected: {domain}")
         
         product_data = {
             'weight': None,
@@ -48,21 +51,28 @@ def scrape_product_data(url):
         
         # Amazon scraping
         if 'amazon.' in domain:
+            print("Using Amazon scraper")
             product_data = scrape_amazon(soup)
         # Flipkart scraping
         elif 'flipkart.' in domain:
+            print("Using Flipkart scraper")
             product_data = scrape_flipkart(soup)
         # Meesho scraping
         elif 'meesho.' in domain:
+            print("Using Meesho scraper")
             product_data = scrape_meesho(soup)
         # Generic scraping
         else:
+            print("Using generic scraper")
             product_data = scrape_generic(soup)
-            
+        
+        print(f"Scraped data: {product_data}")
         return product_data
         
     except Exception as e:
         print(f"Error scraping product data: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def scrape_amazon(soup):
@@ -70,46 +80,134 @@ def scrape_amazon(soup):
     data = {'weight': None, 'dimensions': {'length': None, 'width': None, 'height': None}, 'brand': None, 'title': None}
     
     # Title
-    title_elem = soup.find('span', {'id': 'productTitle'})
-    if title_elem:
-        data['title'] = title_elem.get_text().strip()
+    title_selectors = [
+        {'id': 'productTitle'},
+        {'class': 'a-size-large product-title-word-break'},
+        'h1',
+        {'class': 'a-size-extra-large'}
+    ]
     
-    # Brand
-    brand_elem = soup.find('tr', class_='a-spacing-small po-brand')
-    if brand_elem:
-        brand_span = brand_elem.find('span', class_='a-offscreen')
-        if brand_span:
-            data['brand'] = brand_span.get_text().strip()
+    for selector in title_selectors:
+        if isinstance(selector, dict):
+            title_elem = soup.find('span', selector) or soup.find('h1', selector)
+        else:
+            title_elem = soup.find(selector)
+        if title_elem:
+            data['title'] = title_elem.get_text().strip()
+            break
     
-    # Product details table
-    detail_table = soup.find('table', {'id': 'productDetails_detailBullets_sections1'})
-    if detail_table:
-        rows = detail_table.find_all('tr')
-        for row in rows:
-            label = row.find('th')
-            value = row.find('td')
-            if label and value:
-                label_text = label.get_text().strip().lower()
-                value_text = value.get_text().strip()
-                
-                if 'weight' in label_text:
-                    weight_match = re.search(r'(\d+(?:\.\d+)?)\s*(kg|grams?|g)\b', value_text, re.IGNORECASE)
-                    if weight_match:
-                        weight_val = float(weight_match.group(1))
-                        unit = weight_match.group(2).lower()
-                        if unit in ['g', 'gram', 'grams']:
-                            weight_val = weight_val / 1000  # Convert to kg
-                        data['weight'] = weight_val
-                
-                if 'dimension' in label_text:
-                    # Extract dimensions (L x W x H)
-                    dim_match = re.findall(r'(\d+(?:\.\d+)?)', value_text)
-                    if len(dim_match) >= 3:
-                        data['dimensions'] = {
-                            'length': float(dim_match[0]),
-                            'width': float(dim_match[1]),
-                            'height': float(dim_match[2])
-                        }
+    # Brand - multiple selectors
+    brand_selectors = [
+        {'class': 'a-spacing-small po-brand'},
+        {'class': 'a-row a-spacing-small po-brand'},
+        {'data-hook': 'brand-name'},
+        {'class': 'brand'}
+    ]
+    
+    for selector in brand_selectors:
+        brand_elem = soup.find('tr', selector) or soup.find('span', selector) or soup.find('div', selector)
+        if brand_elem:
+            brand_span = brand_elem.find('span', class_='a-offscreen') or brand_elem.find('a') or brand_elem
+            if brand_span:
+                data['brand'] = brand_span.get_text().strip()
+                break
+    
+    # Look for product details in multiple locations
+    detail_sections = [
+        soup.find('table', {'id': 'productDetails_detailBullets_sections1'}),
+        soup.find('div', {'id': 'productDetails_feature_div'}),
+        soup.find('div', {'class': 'a-section a-spacing-small'}),
+        soup.find('ul', {'class': 'a-unordered-list a-nostyle a-vertical a-spacing-none detail-bullet-list'})
+    ]
+    
+    # Also search in the entire page text for weight and dimensions
+    page_text = soup.get_text().lower()
+    
+    # Extract weight from page text
+    weight_patterns = [
+        r'item weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g|pounds?|lbs?)\b',
+        r'product weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g|pounds?|lbs?)\b',
+        r'weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g|pounds?|lbs?)\b',
+        r'shipping weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g|pounds?|lbs?)\b'
+    ]
+    
+    for pattern in weight_patterns:
+        weight_match = re.search(pattern, page_text, re.IGNORECASE)
+        if weight_match:
+            weight_val = float(weight_match.group(1))
+            unit = weight_match.group(2).lower()
+            if unit in ['g', 'gram', 'grams']:
+                weight_val = weight_val / 1000  # Convert to kg
+            elif unit in ['pounds', 'lbs', 'lb']:
+                weight_val = weight_val * 0.453592  # Convert to kg
+            data['weight'] = round(weight_val, 2)
+            break
+    
+    # Extract dimensions from page text
+    dimension_patterns = [
+        r'product dimensions[:\s]*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)',
+        r'item dimensions[:\s]*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)',
+        r'dimensions[:\s]*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)',
+        r'size[:\s]*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)'
+    ]
+    
+    for pattern in dimension_patterns:
+        dim_match = re.search(pattern, page_text, re.IGNORECASE)
+        if dim_match:
+            data['dimensions'] = {
+                'length': float(dim_match.group(1)),
+                'width': float(dim_match.group(2)),
+                'height': float(dim_match.group(3))
+            }
+            break
+    
+    # Try structured data extraction from detail sections
+    for detail_section in detail_sections:
+        if not detail_section:
+            continue
+            
+        if detail_section.name == 'table':
+            rows = detail_section.find_all('tr')
+            for row in rows:
+                label = row.find('th') or row.find('td', class_='a-span3')
+                value = row.find('td') or row.find('td', class_='a-span9')
+                if label and value:
+                    label_text = label.get_text().strip().lower()
+                    value_text = value.get_text().strip()
+                    
+                    if not data['weight'] and 'weight' in label_text:
+                        weight_match = re.search(r'(\d+(?:\.\d+)?)\s*(kg|grams?|g|pounds?|lbs?)\b', value_text, re.IGNORECASE)
+                        if weight_match:
+                            weight_val = float(weight_match.group(1))
+                            unit = weight_match.group(2).lower()
+                            if unit in ['g', 'gram', 'grams']:
+                                weight_val = weight_val / 1000
+                            elif unit in ['pounds', 'lbs', 'lb']:
+                                weight_val = weight_val * 0.453592
+                            data['weight'] = round(weight_val, 2)
+                    
+                    if not any(data['dimensions'].values()) and 'dimension' in label_text:
+                        dim_match = re.findall(r'(\d+(?:\.\d+)?)', value_text)
+                        if len(dim_match) >= 3:
+                            data['dimensions'] = {
+                                'length': float(dim_match[0]),
+                                'width': float(dim_match[1]),
+                                'height': float(dim_match[2])
+                            }
+        
+        elif detail_section.name in ['div', 'ul']:
+            # Look for spans or list items containing weight/dimension info
+            all_text = detail_section.get_text()
+            if not data['weight'] and ('weight' in all_text.lower()):
+                weight_match = re.search(r'weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|grams?|g|pounds?|lbs?)\b', all_text, re.IGNORECASE)
+                if weight_match:
+                    weight_val = float(weight_match.group(1))
+                    unit = weight_match.group(2).lower()
+                    if unit in ['g', 'gram', 'grams']:
+                        weight_val = weight_val / 1000
+                    elif unit in ['pounds', 'lbs', 'lb']:
+                        weight_val = weight_val * 0.453592
+                    data['weight'] = round(weight_val, 2)
     
     return data
 
@@ -117,38 +215,98 @@ def scrape_flipkart(soup):
     """Scrape Flipkart product page"""
     data = {'weight': None, 'dimensions': {'length': None, 'width': None, 'height': None}, 'brand': None, 'title': None}
     
-    # Title
-    title_elem = soup.find('span', class_='B_NuCI')
-    if title_elem:
-        data['title'] = title_elem.get_text().strip()
+    # Title - multiple selectors
+    title_selectors = [
+        {'class': 'B_NuCI'},
+        {'class': '_35KyD6'},
+        {'class': 'yhB1nd'},
+        'h1'
+    ]
+    
+    for selector in title_selectors:
+        if isinstance(selector, dict):
+            title_elem = soup.find('span', selector) or soup.find('h1', selector)
+        else:
+            title_elem = soup.find(selector)
+        if title_elem:
+            data['title'] = title_elem.get_text().strip()
+            break
+    
+    # Brand
+    brand_elem = soup.find('a', class_='_2b3wE_') or soup.find('span', class_='_2b3wE_')
+    if brand_elem:
+        data['brand'] = brand_elem.get_text().strip()
+    
+    # Search in page text for weight and dimensions
+    page_text = soup.get_text().lower()
+    
+    # Weight extraction
+    weight_patterns = [
+        r'item weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g)\b',
+        r'product weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g)\b',
+        r'weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g)\b'
+    ]
+    
+    for pattern in weight_patterns:
+        weight_match = re.search(pattern, page_text, re.IGNORECASE)
+        if weight_match:
+            weight_val = float(weight_match.group(1))
+            unit = weight_match.group(2).lower()
+            if unit in ['g', 'gram', 'grams']:
+                weight_val = weight_val / 1000
+            data['weight'] = round(weight_val, 2)
+            break
+    
+    # Dimensions extraction
+    dimension_patterns = [
+        r'dimensions[:\s]*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)',
+        r'size[:\s]*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)'
+    ]
+    
+    for pattern in dimension_patterns:
+        dim_match = re.search(pattern, page_text, re.IGNORECASE)
+        if dim_match:
+            data['dimensions'] = {
+                'length': float(dim_match.group(1)),
+                'width': float(dim_match.group(2)),
+                'height': float(dim_match.group(3))
+            }
+            break
     
     # Specifications table
-    spec_tables = soup.find_all('table', class_='_14cfVK')
-    for table in spec_tables:
-        rows = table.find_all('tr')
-        for row in rows:
-            cells = row.find_all('td')
-            if len(cells) >= 2:
-                label = cells[0].get_text().strip().lower()
-                value = cells[1].get_text().strip()
-                
-                if 'weight' in label:
-                    weight_match = re.search(r'(\d+(?:\.\d+)?)\s*(kg|grams?|g)\b', value, re.IGNORECASE)
-                    if weight_match:
-                        weight_val = float(weight_match.group(1))
-                        unit = weight_match.group(2).lower()
-                        if unit in ['g', 'gram', 'grams']:
-                            weight_val = weight_val / 1000
-                        data['weight'] = weight_val
-                
-                if 'dimension' in label:
-                    dim_match = re.findall(r'(\d+(?:\.\d+)?)', value)
-                    if len(dim_match) >= 3:
-                        data['dimensions'] = {
-                            'length': float(dim_match[0]),
-                            'width': float(dim_match[1]),
-                            'height': float(dim_match[2])
-                        }
+    spec_selectors = [
+        {'class': '_14cfVK'},
+        {'class': '_1UhVsV'},
+        {'class': 'col col-3-12 _2H87wv'}
+    ]
+    
+    for selector in spec_selectors:
+        spec_tables = soup.find_all('table', selector)
+        for table in spec_tables:
+            rows = table.find_all('tr')
+            for row in rows:
+                cells = row.find_all('td')
+                if len(cells) >= 2:
+                    label = cells[0].get_text().strip().lower()
+                    value = cells[1].get_text().strip()
+                    
+                    if not data['weight'] and 'weight' in label:
+                        weight_match = re.search(r'(\d+(?:\.\d+)?)\s*(kg|grams?|g)\b', value, re.IGNORECASE)
+                        if weight_match:
+                            weight_val = float(weight_match.group(1))
+                            unit = weight_match.group(2).lower()
+                            if unit in ['g', 'gram', 'grams']:
+                                weight_val = weight_val / 1000
+                            data['weight'] = round(weight_val, 2)
+                    
+                    if not any(data['dimensions'].values()) and 'dimension' in label:
+                        dim_match = re.findall(r'(\d+(?:\.\d+)?)', value)
+                        if len(dim_match) >= 3:
+                            data['dimensions'] = {
+                                'length': float(dim_match[0]),
+                                'width': float(dim_match[1]),
+                                'height': float(dim_match[2])
+                            }
     
     return data
 
