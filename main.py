@@ -78,7 +78,7 @@ def generate_listing():
         """
         
         # Generate content with Gemini Vision
-        model = genai.GenerativeModel('gemini-pro-vision')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         response = model.generate_content([prompt, image])
         
         # Parse the response
