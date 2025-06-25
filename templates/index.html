@@ -72,6 +72,8 @@
             });
             const [productUrl, setProductUrl] = useState('');
             const [scrapingLoading, setScrapingLoading] = useState(false);
+            const [selectedPlatform, setSelectedPlatform] = useState('amazon');
+            const [selectedVersion, setSelectedVersion] = useState(0);
 
             const scrapeProductData = async () => {
                 if (!productUrl) {
@@ -567,46 +569,152 @@
                             {(generatedListing || (mode === 'manual' && manualListing.title)) && (
                                 <div className="glass-effect p-6">
                                     <h3 className="text-xl font-semibold text-white mb-4">📋 Product Listing</h3>
-                                    <div className="bg-white p-4 rounded-lg space-y-4">
-                                        <div>
-                                            <h4 className="font-semibold text-gray-800">Title:</h4>
-                                            <p className="text-gray-600">{mode === 'ai' ? generatedListing?.title : manualListing.title}</p>
-                                        </div>
 
-                                        <div>
-                                            <h4 className="font-semibold text-gray-800">Bullet Points:</h4>
-                                            <ul className="list-disc list-inside text-gray-600">
-                                                {(mode === 'ai' ? generatedListing?.bulletPoints : manualListing.bulletPoints)?.map((bullet, index) => (
-                                                    bullet && <li key={index}>{bullet}</li>
+                                    {mode === 'ai' && generatedListing && (
+                                        <div className="mb-4">
+                                            {/* Platform Selection */}
+                                            <div className="flex space-x-2 mb-3">
+                                                <button
+                                                    onClick={() => {setSelectedPlatform('amazon'); setSelectedVersion(0);}}
+                                                    className={`px-4 py-2 rounded-lg font-semibold ${
+                                                        selectedPlatform === 'amazon' 
+                                                            ? 'bg-orange-500 text-white' 
+                                                            : 'bg-white text-gray-700'
+                                                    }`}
+                                                >
+                                                    Amazon
+                                                </button>
+                                                <button
+                                                    onClick={() => {setSelectedPlatform('flipkart'); setSelectedVersion(0);}}
+                                                    className={`px-4 py-2 rounded-lg font-semibold ${
+                                                        selectedPlatform === 'flipkart' 
+                                                            ? 'bg-blue-500 text-white' 
+                                                            : 'bg-white text-gray-700'
+                                                    }`}
+                                                >
+                                                    Flipkart
+                                                </button>
+                                                <button
+                                                    onClick={() => {setSelectedPlatform('meesho'); setSelectedVersion(0);}}
+                                                    className={`px-4 py-2 rounded-lg font-semibold ${
+                                                        selectedPlatform === 'meesho' 
+                                                            ? 'bg-pink-500 text-white' 
+                                                            : 'bg-white text-gray-700'
+                                                    }`}
+                                                >
+                                                    Meesho
+                                                </button>
+                                            </div>
+
+                                            {/* Version Selection */}
+                                            <div className="flex space-x-2 mb-4">
+                                                {generatedListing[selectedPlatform]?.map((version, index) => (
+                                                    <button
+                                                        key={index}
+                                                        onClick={() => setSelectedVersion(index)}
+                                                        className={`px-3 py-1 rounded-lg text-sm font-medium ${
+                                                            selectedVersion === index 
+                                                                ? 'bg-green-500 text-white' 
+                                                                : 'bg-gray-200 text-gray-700'
+                                                        }`}
+                                                    >
+                                                        V{index + 1}: {version.style}
+                                                    </button>
                                                 ))}
-                                            </ul>
-                                        </div>
-
-                                        <div>
-                                            <h4 className="font-semibold text-gray-800">Description:</h4>
-                                            <p className="text-gray-600">{mode === 'ai' ? generatedListing?.description : manualListing.description}</p>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <h4 className="font-semibold text-gray-800">Category:</h4>
-                                                <p className="text-gray-600">{mode === 'ai' ? generatedListing?.category : manualListing.category}</p>
-                                            </div>
-                                            <div>
-                                                <h4 className="font-semibold text-gray-800">HSN Code:</h4>
-                                                <p className="text-gray-600">{mode === 'ai' ? generatedListing?.hsnCode : manualListing.hsnCode}</p>
                                             </div>
                                         </div>
+                                    )}
 
-                                        <div>
-                                            <h4 className="font-semibold text-gray-800">Keywords:</h4>
-                                            <p className="text-gray-600">
-                                                {mode === 'ai' 
-                                                    ? (Array.isArray(generatedListing?.keywords) ? generatedListing.keywords.join(', ') : (generatedListing?.keywords || ''))
-                                                    : (Array.isArray(manualListing.keywords) ? manualListing.keywords.join(', ') : '')
-                                                }
-                                            </p>
-                                        </div>
+                                    <div className="bg-white p-4 rounded-lg space-y-4">
+                                        {mode === 'ai' && generatedListing && generatedListing[selectedPlatform] && (
+                                            <>
+                                                <div className="bg-gray-100 p-2 rounded">
+                                                    <span className="text-sm font-semibold text-gray-600">
+                                                        {selectedPlatform.toUpperCase()} - Version {selectedVersion + 1}: {generatedListing[selectedPlatform][selectedVersion]?.style}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-semibold text-gray-800">Title:</h4>
+                                                    <p className="text-gray-600">{generatedListing[selectedPlatform][selectedVersion]?.title}</p>
+                                                </div>
+
+                                                <div>
+                                                    <h4 className="font-semibold text-gray-800">Bullet Points:</h4>
+                                                    <ul className="list-disc list-inside text-gray-600">
+                                                        {generatedListing[selectedPlatform][selectedVersion]?.bulletPoints?.map((bullet, index) => (
+                                                            bullet && <li key={index}>{bullet}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+
+                                                <div>
+                                                    <h4 className="font-semibold text-gray-800">Description:</h4>
+                                                    <p className="text-gray-600">{generatedListing[selectedPlatform][selectedVersion]?.description}</p>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <h4 className="font-semibold text-gray-800">Category:</h4>
+                                                        <p className="text-gray-600">{generatedListing[selectedPlatform][selectedVersion]?.category}</p>
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-semibold text-gray-800">HSN Code:</h4>
+                                                        <p className="text-gray-600">{generatedListing[selectedPlatform][selectedVersion]?.hsnCode}</p>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <h4 className="font-semibold text-gray-800">Keywords:</h4>
+                                                    <p className="text-gray-600">
+                                                        {Array.isArray(generatedListing[selectedPlatform][selectedVersion]?.keywords) 
+                                                            ? generatedListing[selectedPlatform][selectedVersion].keywords.join(', ') 
+                                                            : (generatedListing[selectedPlatform][selectedVersion]?.keywords || '')
+                                                        }
+                                                    </p>
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {mode === 'manual' && manualListing.title && (
+                                            <>
+                                                <div>
+                                                    <h4 className="font-semibold text-gray-800">Title:</h4>
+                                                    <p className="text-gray-600">{manualListing.title}</p>
+                                                </div>
+
+                                                <div>
+                                                    <h4 className="font-semibold text-gray-800">Bullet Points:</h4>
+                                                    <ul className="list-disc list-inside text-gray-600">
+                                                        {manualListing.bulletPoints?.map((bullet, index) => (
+                                                            bullet && <li key={index}>{bullet}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+
+                                                <div>
+                                                    <h4 className="font-semibold text-gray-800">Description:</h4>
+                                                    <p className="text-gray-600">{manualListing.description}</p>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <h4 className="font-semibold text-gray-800">Category:</h4>
+                                                        <p className="text-gray-600">{manualListing.category}</p>
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-semibold text-gray-800">HSN Code:</h4>
+                                                        <p className="text-gray-600">{manualListing.hsnCode}</p>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <h4 className="font-semibold text-gray-800">Keywords:</h4>
+                                                    <p className="text-gray-600">
+                                                        {Array.isArray(manualListing.keywords) ? manualListing.keywords.join(', ') : ''}
+                                                    </p>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             )}

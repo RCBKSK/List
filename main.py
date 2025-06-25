@@ -568,7 +568,7 @@ def generate_listing():
         
         # Create prompt for Gemini
         prompt = f"""
-        Analyze this product image and generate an e-commerce listing for Indian marketplaces (Amazon, Flipkart, Meesho).
+        Analyze this product image and generate 3 different versions of e-commerce listings for Indian marketplaces (Amazon, Flipkart, Meesho).
         
         Additional product information:
         - Product Name: {product_name}
@@ -578,15 +578,105 @@ def generate_listing():
         
         Please provide a JSON response with the following structure:
         {{
-            "title": "Product title under 200 characters",
-            "bulletPoints": ["3-5 bullet points under 250 chars each"],
-            "description": "50-75 words description",
-            "category": "Suggested category",
-            "hsnCode": "HSN code preferably from 5% GST slab",
-            "keywords": ["comma-separated SEO keywords"]
+            "amazon": [
+                {{
+                    "version": 1,
+                    "style": "Professional & Detailed",
+                    "title": "Product title under 200 characters with technical focus",
+                    "bulletPoints": ["3-5 bullet points focusing on quality and specifications"],
+                    "description": "50-75 words professional description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["technical and quality-focused SEO keywords"]
+                }},
+                {{
+                    "version": 2,
+                    "style": "Benefit-Focused",
+                    "title": "Product title emphasizing benefits and value",
+                    "bulletPoints": ["3-5 bullet points highlighting customer benefits"],
+                    "description": "50-75 words benefit-focused description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["benefit and value-focused SEO keywords"]
+                }},
+                {{
+                    "version": 3,
+                    "style": "Emotional & Lifestyle",
+                    "title": "Product title with emotional appeal and lifestyle focus",
+                    "bulletPoints": ["3-5 bullet points connecting to lifestyle and emotions"],
+                    "description": "50-75 words emotional and lifestyle description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["lifestyle and emotional SEO keywords"]
+                }}
+            ],
+            "flipkart": [
+                {{
+                    "version": 1,
+                    "style": "Feature-Rich",
+                    "title": "Product title highlighting key features",
+                    "bulletPoints": ["3-5 bullet points showcasing features"],
+                    "description": "50-75 words feature-focused description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["feature-focused SEO keywords"]
+                }},
+                {{
+                    "version": 2,
+                    "style": "Value & Savings",
+                    "title": "Product title emphasizing value and savings",
+                    "bulletPoints": ["3-5 bullet points highlighting value proposition"],
+                    "description": "50-75 words value-oriented description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["value and savings SEO keywords"]
+                }},
+                {{
+                    "version": 3,
+                    "style": "Trendy & Modern",
+                    "title": "Product title with trendy and modern appeal",
+                    "bulletPoints": ["3-5 bullet points focusing on modern aspects"],
+                    "description": "50-75 words trendy description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["trendy and modern SEO keywords"]
+                }}
+            ],
+            "meesho": [
+                {{
+                    "version": 1,
+                    "style": "Affordable & Practical",
+                    "title": "Product title emphasizing affordability",
+                    "bulletPoints": ["3-5 bullet points highlighting practical benefits"],
+                    "description": "50-75 words practical description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["affordable and practical SEO keywords"]
+                }},
+                {{
+                    "version": 2,
+                    "style": "Family & Home",
+                    "title": "Product title connecting to family and home use",
+                    "bulletPoints": ["3-5 bullet points for family appeal"],
+                    "description": "50-75 words family-oriented description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["family and home SEO keywords"]
+                }},
+                {{
+                    "version": 3,
+                    "style": "Simple & Easy",
+                    "title": "Product title emphasizing simplicity and ease",
+                    "bulletPoints": ["3-5 bullet points about ease of use"],
+                    "description": "50-75 words simple description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["simple and easy SEO keywords"]
+                }}
+            ]
         }}
         
-        Make the content appealing for Indian customers, include relevant features, benefits, and specifications.
+        Make each version distinctly different in tone, focus, and keywords while maintaining accuracy about the product.
         """
         
         # Generate content with Gemini Vision
@@ -621,16 +711,102 @@ def generate_listing():
             print(f"JSON parsing error: {parse_error}")
             # Fallback if JSON parsing fails
             listing_data = {
-                "title": f"{brand} {product_name}".strip() or "Product Title",
-                "bulletPoints": [
-                    "High quality product",
-                    "Suitable for daily use",
-                    "Durable and long-lasting"
+                "amazon": [
+                    {
+                        "version": 1,
+                        "style": "Professional & Detailed",
+                        "title": f"{brand} {product_name} - Premium Quality".strip() or "Premium Product Title",
+                        "bulletPoints": ["High quality construction", "Professional grade materials", "Durable and long-lasting"],
+                        "description": "Professional quality product with excellent features and reliable performance for everyday use.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["premium", "quality", "professional"]
+                    },
+                    {
+                        "version": 2,
+                        "style": "Benefit-Focused",
+                        "title": f"{brand} {product_name} - Great Value".strip() or "Value Product Title",
+                        "bulletPoints": ["Excellent value for money", "Perfect for daily use", "Saves time and effort"],
+                        "description": "Value-packed product offering great benefits and convenience for your daily needs.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["value", "benefits", "convenient"]
+                    },
+                    {
+                        "version": 3,
+                        "style": "Emotional & Lifestyle",
+                        "title": f"{brand} {product_name} - Lifestyle Essential".strip() or "Lifestyle Product Title",
+                        "bulletPoints": ["Enhances your lifestyle", "Perfect for modern living", "Brings joy to everyday moments"],
+                        "description": "Transform your lifestyle with this essential product designed for modern living and everyday happiness.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["lifestyle", "modern", "essential"]
+                    }
                 ],
-                "description": "Quality product with excellent features and reliable performance for everyday use.",
-                "category": "General",
-                "hsnCode": "9999",
-                "keywords": ["quality", "durable", "reliable"]
+                "flipkart": [
+                    {
+                        "version": 1,
+                        "style": "Feature-Rich",
+                        "title": f"{brand} {product_name} - Feature Packed".strip() or "Feature-Rich Product",
+                        "bulletPoints": ["Multiple useful features", "Advanced functionality", "Easy to operate"],
+                        "description": "Feature-packed product with advanced functionality designed for optimal performance.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["features", "advanced", "functionality"]
+                    },
+                    {
+                        "version": 2,
+                        "style": "Value & Savings",
+                        "title": f"{brand} {product_name} - Best Deal".strip() or "Best Deal Product",
+                        "bulletPoints": ["Unbeatable price", "Maximum savings", "Great investment"],
+                        "description": "Incredible value product offering maximum savings without compromising on quality.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["savings", "deal", "value"]
+                    },
+                    {
+                        "version": 3,
+                        "style": "Trendy & Modern",
+                        "title": f"{brand} {product_name} - Trendy Choice".strip() or "Trendy Product",
+                        "bulletPoints": ["Latest design trends", "Modern aesthetics", "Stylish appearance"],
+                        "description": "Trendy and modern product that combines style with functionality for today's consumers.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["trendy", "modern", "stylish"]
+                    }
+                ],
+                "meesho": [
+                    {
+                        "version": 1,
+                        "style": "Affordable & Practical",
+                        "title": f"{brand} {product_name} - Budget Friendly".strip() or "Budget-Friendly Product",
+                        "bulletPoints": ["Affordable pricing", "Practical solution", "Good quality at low cost"],
+                        "description": "Budget-friendly product offering practical solutions without breaking the bank.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["affordable", "budget", "practical"]
+                    },
+                    {
+                        "version": 2,
+                        "style": "Family & Home",
+                        "title": f"{brand} {product_name} - Family Choice".strip() or "Family Product",
+                        "bulletPoints": ["Perfect for families", "Safe for home use", "Loved by everyone"],
+                        "description": "Family-friendly product designed to bring convenience and happiness to your home.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["family", "home", "safe"]
+                    },
+                    {
+                        "version": 3,
+                        "style": "Simple & Easy",
+                        "title": f"{brand} {product_name} - Easy to Use".strip() or "Easy-to-Use Product",
+                        "bulletPoints": ["Simple operation", "No complex setup", "User-friendly design"],
+                        "description": "Simple and easy-to-use product with user-friendly design for hassle-free experience.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["simple", "easy", "user-friendly"]
+                    }
+                ]
             }
             print("Using fallback listing data")
         
