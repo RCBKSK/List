@@ -31,16 +31,33 @@ def scrape_product_data(url):
     try:
         print(f"Scraping URL: {url}")
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
         }
         
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
-        print(f"Response status: {response.status_code}")
+        print(f"Response status: {response.status_code}, Content length: {len(response.content)}")
         
         soup = BeautifulSoup(response.content, 'html.parser')
         domain = urlparse(url).netloc.lower()
         print(f"Domain detected: {domain}")
+        
+        # Find all text containing "weight" or "dimension" for debugging
+        page_text = soup.get_text()
+        weight_mentions = [line.strip() for line in page_text.split('\n') if 'weight' in line.lower() and line.strip()]
+        dimension_mentions = [line.strip() for line in page_text.split('\n') if any(word in line.lower() for word in ['dimension', 'size', 'length', 'width', 'height']) and line.strip() and len(line.strip()) < 200]
+        
+        print(f"Found {len(weight_mentions)} weight mentions")
+        print(f"Found {len(dimension_mentions)} dimension mentions")
+        if weight_mentions:
+            print(f"Sample weight mentions: {weight_mentions[:3]}")
+        if dimension_mentions:
+            print(f"Sample dimension mentions: {dimension_mentions[:3]}")
         
         product_data = {
             'weight': None,
@@ -66,7 +83,7 @@ def scrape_product_data(url):
             print("Using generic scraper")
             product_data = scrape_generic(soup)
         
-        print(f"Scraped data: {product_data}")
+        print(f"Final scraped data: {product_data}")
         return product_data
         
     except Exception as e:
@@ -79,87 +96,172 @@ def scrape_amazon(soup):
     """Scrape Amazon product page"""
     data = {'weight': None, 'dimensions': {'length': None, 'width': None, 'height': None}, 'brand': None, 'title': None}
     
-    # Title
+    # Enhanced title extraction with more selectors
     title_selectors = [
         {'id': 'productTitle'},
         {'class': 'a-size-large product-title-word-break'},
+        {'class': 'a-size-large a-spacing-none a-color-base'},
+        {'class': '_p13n-zg-list-grid-desktop'},
+        'h1.a-size-large',
         'h1',
-        {'class': 'a-size-extra-large'}
+        'span#productTitle',
+        '[data-automation-id="product-title"]'
     ]
     
+    # Try multiple approaches for title
     for selector in title_selectors:
-        if isinstance(selector, dict):
-            title_elem = soup.find('span', selector) or soup.find('h1', selector)
-        else:
-            title_elem = soup.find(selector)
-        if title_elem:
-            data['title'] = title_elem.get_text().strip()
-            break
+        try:
+            if isinstance(selector, dict):
+                title_elem = soup.find('span', selector) or soup.find('h1', selector) or soup.find('div', selector)
+            else:
+                title_elem = soup.select_one(selector) if '.' in selector or '#' in selector or '[' in selector else soup.find(selector)
+            if title_elem and title_elem.get_text().strip():
+                data['title'] = title_elem.get_text().strip()[:200]  # Limit title length
+                break
+        except:
+            continue
     
-    # Brand - multiple selectors
+    # Fallback: search for title in meta tags
+    if not data['title']:
+        meta_title = soup.find('meta', {'property': 'og:title'}) or soup.find('meta', {'name': 'title'})
+        if meta_title and meta_title.get('content'):
+            data['title'] = meta_title.get('content').strip()[:200]
+    
+    # Enhanced brand extraction
     brand_selectors = [
         {'class': 'a-spacing-small po-brand'},
         {'class': 'a-row a-spacing-small po-brand'},
         {'data-hook': 'brand-name'},
-        {'class': 'brand'}
+        {'class': 'brand'},
+        {'class': 'a-text-bold'},
+        'tr.a-spacing-small.po-brand td.a-span9 span.a-offscreen',
+        '[data-testid="brand-name"]'
     ]
     
     for selector in brand_selectors:
-        brand_elem = soup.find('tr', selector) or soup.find('span', selector) or soup.find('div', selector)
-        if brand_elem:
-            brand_span = brand_elem.find('span', class_='a-offscreen') or brand_elem.find('a') or brand_elem
-            if brand_span:
-                data['brand'] = brand_span.get_text().strip()
-                break
+        try:
+            if isinstance(selector, dict):
+                brand_elem = soup.find('tr', selector) or soup.find('span', selector) or soup.find('div', selector) or soup.find('td', selector)
+            else:
+                brand_elem = soup.select_one(selector)
+            
+            if brand_elem:
+                # Try different ways to extract brand text
+                brand_text = None
+                brand_span = brand_elem.find('span', class_='a-offscreen')
+                if brand_span:
+                    brand_text = brand_span.get_text().strip()
+                elif brand_elem.find('a'):
+                    brand_text = brand_elem.find('a').get_text().strip()
+                else:
+                    brand_text = brand_elem.get_text().strip()
+                
+                if brand_text and len(brand_text) < 50:  # Reasonable brand name length
+                    data['brand'] = brand_text
+                    break
+        except:
+            continue
     
-    # Look for product details in multiple locations
+    # Fallback: look for brand in the page text using patterns
+    if not data['brand']:
+        page_text = soup.get_text()
+        brand_patterns = [
+            r'Brand[:\s]+([A-Za-z0-9\s&-]+?)(?:\n|Visit|Store|Shop)',
+            r'by\s+([A-Za-z0-9\s&-]+?)(?:\n|\s{2,})',
+            r'Manufacturer[:\s]+([A-Za-z0-9\s&-]+?)(?:\n|;)'
+        ]
+        
+        for pattern in brand_patterns:
+            brand_match = re.search(pattern, page_text, re.IGNORECASE)
+            if brand_match:
+                brand_candidate = brand_match.group(1).strip()
+                if len(brand_candidate) < 50 and brand_candidate:
+                    data['brand'] = brand_candidate
+                    break
+    
+    # Comprehensive product details extraction
     detail_sections = [
         soup.find('table', {'id': 'productDetails_detailBullets_sections1'}),
         soup.find('div', {'id': 'productDetails_feature_div'}),
+        soup.find('div', {'id': 'productDetails_techSpec_section_1'}),
         soup.find('div', {'class': 'a-section a-spacing-small'}),
-        soup.find('ul', {'class': 'a-unordered-list a-nostyle a-vertical a-spacing-none detail-bullet-list'})
+        soup.find('ul', {'class': 'a-unordered-list a-nostyle a-vertical a-spacing-none detail-bullet-list'}),
+        soup.find('div', {'id': 'detailBullets_feature_div'}),
+        soup.find('table', {'class': 'a-keyvalue prodDetTable'}),
+        soup.find('div', {'data-hook': 'product-details'})
     ]
     
-    # Also search in the entire page text for weight and dimensions
-    page_text = soup.get_text().lower()
+    # Get page text for fallback extraction
+    page_text = soup.get_text()
+    page_text_lower = page_text.lower()
     
-    # Extract weight from page text
+    print(f"Page text preview: {page_text[:500]}")  # Debug log
+    
+    # Enhanced weight extraction with more patterns
     weight_patterns = [
-        r'item weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g|pounds?|lbs?)\b',
-        r'product weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g|pounds?|lbs?)\b',
-        r'weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g|pounds?|lbs?)\b',
-        r'shipping weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g|pounds?|lbs?)\b'
+        r'item\s+weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g|pounds?|lbs?|oz)\b',
+        r'product\s+weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g|pounds?|lbs?|oz)\b',
+        r'shipping\s+weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g|pounds?|lbs?|oz)\b',
+        r'weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g|pounds?|lbs?|oz)\b',
+        r'(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g|pounds?|lbs?|oz)(?:\s+weight|\s+wt\.?)',
+        r'weight[:\s]*(\d+(?:\.\d+)?)\s*([kKgG])\b',
+        r'net\s+weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g|pounds?|lbs?|oz)\b'
     ]
     
     for pattern in weight_patterns:
         weight_match = re.search(pattern, page_text, re.IGNORECASE)
         if weight_match:
-            weight_val = float(weight_match.group(1))
-            unit = weight_match.group(2).lower()
-            if unit in ['g', 'gram', 'grams']:
-                weight_val = weight_val / 1000  # Convert to kg
-            elif unit in ['pounds', 'lbs', 'lb']:
-                weight_val = weight_val * 0.453592  # Convert to kg
-            data['weight'] = round(weight_val, 2)
-            break
+            try:
+                weight_val = float(weight_match.group(1))
+                unit = weight_match.group(2).lower()
+                
+                # Convert to kg
+                if unit in ['g', 'gram', 'grams']:
+                    weight_val = weight_val / 1000
+                elif unit in ['pounds', 'lbs', 'lb']:
+                    weight_val = weight_val * 0.453592
+                elif unit in ['oz', 'ounce', 'ounces']:
+                    weight_val = weight_val * 0.0283495
+                elif unit in ['k', 'kg', 'kilogram', 'kilograms']:
+                    pass  # Already in kg
+                
+                if 0.001 <= weight_val <= 1000:  # Reasonable weight range
+                    data['weight'] = round(weight_val, 3)
+                    print(f"Found weight: {data['weight']} kg")
+                    break
+            except ValueError:
+                continue
     
-    # Extract dimensions from page text
+    # Enhanced dimension extraction with more patterns
     dimension_patterns = [
-        r'product dimensions[:\s]*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)',
-        r'item dimensions[:\s]*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)',
-        r'dimensions[:\s]*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)',
-        r'size[:\s]*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)'
+        r'product\s+dimensions[:\s]*(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)',
+        r'item\s+dimensions[:\s]*(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)',
+        r'package\s+dimensions[:\s]*(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)',
+        r'dimensions[:\s]*(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)',
+        r'size[:\s]*(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)',
+        r'(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)\s*(?:cm|centimeter|mm|millimeter|inch|inches|in)',
+        r'(\d+(?:\.\d+)?)\s*cm\s*[×x]\s*(\d+(?:\.\d+)?)\s*cm\s*[×x]\s*(\d+(?:\.\d+)?)\s*cm'
     ]
     
     for pattern in dimension_patterns:
         dim_match = re.search(pattern, page_text, re.IGNORECASE)
         if dim_match:
-            data['dimensions'] = {
-                'length': float(dim_match.group(1)),
-                'width': float(dim_match.group(2)),
-                'height': float(dim_match.group(3))
-            }
-            break
+            try:
+                length = float(dim_match.group(1))
+                width = float(dim_match.group(2))
+                height = float(dim_match.group(3))
+                
+                # Reasonable dimension range (0.1cm to 500cm)
+                if all(0.1 <= dim <= 500 for dim in [length, width, height]):
+                    data['dimensions'] = {
+                        'length': round(length, 2),
+                        'width': round(width, 2),
+                        'height': round(height, 2)
+                    }
+                    print(f"Found dimensions: {data['dimensions']}")
+                    break
+            except ValueError:
+                continue
     
     # Try structured data extraction from detail sections
     for detail_section in detail_sections:
