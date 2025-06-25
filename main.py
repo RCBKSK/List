@@ -10,6 +10,10 @@ import pandas as pd
 import os
 from datetime import datetime
 import tempfile
+import requests
+from bs4 import BeautifulSoup
+import re
+from urllib.parse import urlparse
 
 app = Flask(__name__)
 CORS(app)
@@ -21,6 +25,243 @@ def configure_gemini(api_key):
     global genai_api_key
     genai_api_key = api_key
     genai.configure(api_key=api_key)
+
+def scrape_product_data(url):
+    """Scrape product dimensions and weight from e-commerce URLs"""
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.content, 'html.parser')
+        domain = urlparse(url).netloc.lower()
+        
+        product_data = {
+            'weight': None,
+            'dimensions': {'length': None, 'width': None, 'height': None},
+            'brand': None,
+            'title': None
+        }
+        
+        # Amazon scraping
+        if 'amazon.' in domain:
+            product_data = scrape_amazon(soup)
+        # Flipkart scraping
+        elif 'flipkart.' in domain:
+            product_data = scrape_flipkart(soup)
+        # Meesho scraping
+        elif 'meesho.' in domain:
+            product_data = scrape_meesho(soup)
+        # Generic scraping
+        else:
+            product_data = scrape_generic(soup)
+            
+        return product_data
+        
+    except Exception as e:
+        print(f"Error scraping product data: {e}")
+        return None
+
+def scrape_amazon(soup):
+    """Scrape Amazon product page"""
+    data = {'weight': None, 'dimensions': {'length': None, 'width': None, 'height': None}, 'brand': None, 'title': None}
+    
+    # Title
+    title_elem = soup.find('span', {'id': 'productTitle'})
+    if title_elem:
+        data['title'] = title_elem.get_text().strip()
+    
+    # Brand
+    brand_elem = soup.find('tr', class_='a-spacing-small po-brand')
+    if brand_elem:
+        brand_span = brand_elem.find('span', class_='a-offscreen')
+        if brand_span:
+            data['brand'] = brand_span.get_text().strip()
+    
+    # Product details table
+    detail_table = soup.find('table', {'id': 'productDetails_detailBullets_sections1'})
+    if detail_table:
+        rows = detail_table.find_all('tr')
+        for row in rows:
+            label = row.find('th')
+            value = row.find('td')
+            if label and value:
+                label_text = label.get_text().strip().lower()
+                value_text = value.get_text().strip()
+                
+                if 'weight' in label_text:
+                    weight_match = re.search(r'(\d+(?:\.\d+)?)\s*(kg|grams?|g)\b', value_text, re.IGNORECASE)
+                    if weight_match:
+                        weight_val = float(weight_match.group(1))
+                        unit = weight_match.group(2).lower()
+                        if unit in ['g', 'gram', 'grams']:
+                            weight_val = weight_val / 1000  # Convert to kg
+                        data['weight'] = weight_val
+                
+                if 'dimension' in label_text:
+                    # Extract dimensions (L x W x H)
+                    dim_match = re.findall(r'(\d+(?:\.\d+)?)', value_text)
+                    if len(dim_match) >= 3:
+                        data['dimensions'] = {
+                            'length': float(dim_match[0]),
+                            'width': float(dim_match[1]),
+                            'height': float(dim_match[2])
+                        }
+    
+    return data
+
+def scrape_flipkart(soup):
+    """Scrape Flipkart product page"""
+    data = {'weight': None, 'dimensions': {'length': None, 'width': None, 'height': None}, 'brand': None, 'title': None}
+    
+    # Title
+    title_elem = soup.find('span', class_='B_NuCI')
+    if title_elem:
+        data['title'] = title_elem.get_text().strip()
+    
+    # Specifications table
+    spec_tables = soup.find_all('table', class_='_14cfVK')
+    for table in spec_tables:
+        rows = table.find_all('tr')
+        for row in rows:
+            cells = row.find_all('td')
+            if len(cells) >= 2:
+                label = cells[0].get_text().strip().lower()
+                value = cells[1].get_text().strip()
+                
+                if 'weight' in label:
+                    weight_match = re.search(r'(\d+(?:\.\d+)?)\s*(kg|grams?|g)\b', value, re.IGNORECASE)
+                    if weight_match:
+                        weight_val = float(weight_match.group(1))
+                        unit = weight_match.group(2).lower()
+                        if unit in ['g', 'gram', 'grams']:
+                            weight_val = weight_val / 1000
+                        data['weight'] = weight_val
+                
+                if 'dimension' in label:
+                    dim_match = re.findall(r'(\d+(?:\.\d+)?)', value)
+                    if len(dim_match) >= 3:
+                        data['dimensions'] = {
+                            'length': float(dim_match[0]),
+                            'width': float(dim_match[1]),
+                            'height': float(dim_match[2])
+                        }
+    
+    return data
+
+def scrape_meesho(soup):
+    """Scrape Meesho product page"""
+    data = {'weight': None, 'dimensions': {'length': None, 'width': None, 'height': None}, 'brand': None, 'title': None}
+    
+    # Basic implementation for Meesho
+    title_elem = soup.find('h1')
+    if title_elem:
+        data['title'] = title_elem.get_text().strip()
+    
+    return data
+
+def scrape_generic(soup):
+    """Generic scraping for other sites"""
+    data = {'weight': None, 'dimensions': {'length': None, 'width': None, 'height': None}, 'brand': None, 'title': None}
+    
+    # Try to find title
+    title_elem = soup.find('h1') or soup.find('title')
+    if title_elem:
+        data['title'] = title_elem.get_text().strip()
+    
+    return data
+
+def calculate_marketplace_shipping(weight, dimensions, marketplace='amazon'):
+    """Calculate shipping charges for different marketplaces"""
+    length = dimensions.get('length', 0)
+    width = dimensions.get('width', 0) 
+    height = dimensions.get('height', 0)
+    
+    # Calculate volumetric weight
+    volumetric_weight = (length * width * height) / 5000 if all([length, width, height]) else 0
+    
+    # Use higher of actual weight or volumetric weight
+    chargeable_weight = max(weight or 0, volumetric_weight)
+    
+    shipping_costs = {
+        'amazon': calculate_amazon_shipping(chargeable_weight, dimensions),
+        'flipkart': calculate_flipkart_shipping(chargeable_weight, dimensions),
+        'meesho': calculate_meesho_shipping(chargeable_weight, dimensions)
+    }
+    
+    if marketplace == 'all':
+        return shipping_costs
+    else:
+        return shipping_costs.get(marketplace, shipping_costs['amazon'])
+
+def calculate_amazon_shipping(weight, dimensions):
+    """Amazon shipping calculation"""
+    if weight <= 0.5:
+        local_shipping = 45
+        regional_shipping = 55
+        national_shipping = 65
+    elif weight <= 1:
+        local_shipping = 60
+        regional_shipping = 70
+        national_shipping = 85
+    elif weight <= 2:
+        local_shipping = 80
+        regional_shipping = 95
+        national_shipping = 115
+    else:
+        # Per additional kg
+        additional_kg = weight - 2
+        local_shipping = 80 + (additional_kg * 25)
+        regional_shipping = 95 + (additional_kg * 30)
+        national_shipping = 115 + (additional_kg * 40)
+    
+    return {
+        'local': round(local_shipping, 2),
+        'regional': round(regional_shipping, 2),
+        'national': round(national_shipping, 2),
+        'average': round((local_shipping + regional_shipping + national_shipping) / 3, 2)
+    }
+
+def calculate_flipkart_shipping(weight, dimensions):
+    """Flipkart shipping calculation"""
+    if weight <= 0.5:
+        shipping = 50
+    elif weight <= 1:
+        shipping = 75
+    elif weight <= 2:
+        shipping = 100
+    else:
+        additional_kg = weight - 2
+        shipping = 100 + (additional_kg * 30)
+    
+    return {
+        'local': round(shipping * 0.8, 2),
+        'regional': round(shipping, 2),
+        'national': round(shipping * 1.3, 2),
+        'average': round(shipping, 2)
+    }
+
+def calculate_meesho_shipping(weight, dimensions):
+    """Meesho shipping calculation"""
+    if weight <= 0.5:
+        shipping = 40
+    elif weight <= 1:
+        shipping = 60
+    elif weight <= 2:
+        shipping = 85
+    else:
+        additional_kg = weight - 2
+        shipping = 85 + (additional_kg * 25)
+    
+    return {
+        'local': round(shipping * 0.7, 2),
+        'regional': round(shipping * 0.9, 2),
+        'national': round(shipping * 1.2, 2),
+        'average': round(shipping * 0.9, 2)
+    }
 
 @app.route('/')
 def index():
@@ -150,49 +391,57 @@ def calculate_price():
         cost_price = float(data.get('costPrice', 0))
         profit_margin = float(data.get('profitMargin', 42.5)) / 100
         gst_rate = 0.05  # Fixed 5% GST
-        platform_commission = float(data.get('platformCommission', 15)) / 100
+        marketplace = data.get('marketplace', 'amazon')
         
-        # Calculate dimensions and shipping
+        # Get weight and dimensions
+        weight = float(data.get('weight', 0))
         length = float(data.get('length', 0))
         width = float(data.get('width', 0))
         height = float(data.get('height', 0))
         
-        # Volumetric weight calculation
-        volumetric_weight = (length * width * height) / 5000 if all([length, width, height]) else 0
+        dimensions = {'length': length, 'width': width, 'height': height}
         
-        # Shipping cost calculation
-        if volumetric_weight <= 0.5:
-            shipping_cost = 100
-        elif volumetric_weight <= 1:
-            shipping_cost = 140
-        elif volumetric_weight <= 1.5:
-            shipping_cost = 180
-        else:
-            shipping_cost = 220
+        # Calculate marketplace-specific shipping
+        shipping_data = calculate_marketplace_shipping(weight, dimensions, 'all')
         
-        # Price calculation
-        # Cost + GST + Profit + Platform Commission + Shipping
-        cost_with_gst = cost_price * (1 + gst_rate)
-        target_profit = cost_price * profit_margin
-        
-        # Calculate selling price considering all costs
-        base_price = cost_with_gst + target_profit + shipping_cost
-        final_price = base_price / (1 - platform_commission)
-        
-        mrp = final_price * 1.2  # 20% above selling price for MRP
-        
-        price_breakdown = {
-            'costPrice': cost_price,
-            'gst': cost_price * gst_rate,
-            'targetProfit': target_profit,
-            'shippingCost': shipping_cost,
-            'platformCommission': final_price * platform_commission,
-            'sellingPrice': round(final_price, 2),
-            'mrp': round(mrp, 2),
-            'volumetricWeight': round(volumetric_weight, 2)
+        # Platform commission rates
+        commission_rates = {
+            'amazon': 0.15,  # 15%
+            'flipkart': 0.12,  # 12%
+            'meesho': 0.08   # 8%
         }
         
-        return jsonify({'success': True, 'data': price_breakdown})
+        price_breakdowns = {}
+        
+        for platform, shipping_info in shipping_data.items():
+            platform_commission = commission_rates.get(platform, 0.15)
+            avg_shipping = shipping_info['average']
+            
+            # Price calculation
+            cost_with_gst = cost_price * (1 + gst_rate)
+            target_profit = cost_price * profit_margin
+            
+            # Calculate selling price considering all costs
+            base_price = cost_with_gst + target_profit + avg_shipping
+            final_price = base_price / (1 - platform_commission)
+            
+            mrp = final_price * 1.2  # 20% above selling price for MRP
+            
+            price_breakdowns[platform] = {
+                'costPrice': cost_price,
+                'gst': round(cost_price * gst_rate, 2),
+                'targetProfit': round(target_profit, 2),
+                'shippingCost': round(avg_shipping, 2),
+                'shippingDetails': shipping_info,
+                'platformCommission': round(final_price * platform_commission, 2),
+                'platformCommissionRate': f"{platform_commission * 100}%",
+                'sellingPrice': round(final_price, 2),
+                'mrp': round(mrp, 2),
+                'weight': weight,
+                'volumetricWeight': round((length * width * height) / 5000, 2) if all([length, width, height]) else 0
+            }
+        
+        return jsonify({'success': True, 'data': price_breakdowns})
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -270,6 +519,34 @@ def configure_gemini_api():
         
         configure_gemini(api_key)
         return jsonify({'success': True, 'message': 'Gemini API configured successfully'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/scrape-product', methods=['POST'])
+def scrape_product():
+    try:
+        data = request.get_json()
+        url = data.get('url')
+        
+        if not url:
+            return jsonify({'error': 'URL is required'}), 400
+        
+        product_data = scrape_product_data(url)
+        
+        if product_data:
+            # Calculate shipping for all marketplaces
+            if product_data['weight'] or any(product_data['dimensions'].values()):
+                shipping_costs = calculate_marketplace_shipping(
+                    product_data['weight'], 
+                    product_data['dimensions'], 
+                    'all'
+                )
+                product_data['shipping'] = shipping_costs
+            
+            return jsonify({'success': True, 'data': product_data})
+        else:
+            return jsonify({'error': 'Could not extract product data from URL'}), 400
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
