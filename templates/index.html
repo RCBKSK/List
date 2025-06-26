@@ -53,6 +53,7 @@
                 brand: '',
                 dimensions: '',
                 costPrice: '',
+                weight: '',
                 length: '',
                 width: '',
                 height: '',
@@ -342,7 +343,7 @@
 
             useEffect(() => {
                 if (productInfo.costPrice) {
-                    calculatePrice();
+                    calculatePricing();
                 }
             }, [productInfo.costPrice, productInfo.profitMargin, productInfo.platformCommission, productInfo.length, productInfo.width, productInfo.height]);
 
@@ -765,6 +766,13 @@
                                         placeholder="Dimensions"
                                         value={productInfo.dimensions}
                                         onChange={(e) => setProductInfo({...productInfo, dimensions: e.target.value})}
+                                        className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <input
+                                        type="number"
+                                        placeholder="Weight (kg)"
+                                        value={productInfo.weight}
+                                        onChange={(e) => setProductInfo({...productInfo, weight: e.target.value})}
                                         className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>
