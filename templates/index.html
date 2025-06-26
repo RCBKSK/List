@@ -670,9 +670,10 @@
                                                         <h5 className="font-semibold text-gray-800">HSN Code:</h5>
                                                         <p className="text-gray-600">{version.hsnCode}</p>
                                                         <p className="text-xs text-blue-600 cursor-pointer hover:underline" 
-                                                           onClick={() => checkGstRate(version.hsnCode, `gst-info-amazon-${version.version}`)}>
+                                                           onClick={() => checkGstRate(version.hsnCode, `gst-info-amazon-${index}`)}>
                                                             Click to check GST rate
                                                         </p>
+                                                        <div id={`gst-info-amazon-${index}`} className="text-xs text-green-600 mt-1"></div>
                                                     </div>
                                                 </div>
                                                 <div>
@@ -721,9 +722,10 @@
                                                         <h5 className="font-semibold text-gray-800">HSN Code:</h5>
                                                         <p className="text-gray-600">{version.hsnCode}</p>
                                                          <p className="text-xs text-blue-600 cursor-pointer hover:underline" 
-                                                           onClick={() => checkGstRate(version.hsnCode, `gst-info-flipkart-${version.version}`)}>
+                                                           onClick={() => checkGstRate(version.hsnCode, `gst-info-flipkart-${index}`)}>
                                                             Click to check GST rate
                                                         </p>
+                                                        <div id={`gst-info-flipkart-${index}`} className="text-xs text-green-600 mt-1"></div>
                                                     </div>
                                                 </div>
                                                 <div>
@@ -772,9 +774,10 @@
                                                         <h5 className="font-semibold text-gray-800">HSN Code:</h5>
                                                         <p className="text-gray-600">{version.hsnCode}</p>
                                                         <p className="text-xs text-blue-600 cursor-pointer hover:underline" 
-                                                           onClick={() => checkGstRate(version.hsnCode, `gst-info-meesho-${version.version}`)}>
+                                                           onClick={() => checkGstRate(version.hsnCode, `gst-info-meesho-${index}`)}>
                                                             Click to check GST rate
                                                         </p>
+                                                        <div id={`gst-info-meesho-${index}`} className="text-xs text-green-600 mt-1"></div>
                                                     </div>
                                                 </div>
                                                 <div>
