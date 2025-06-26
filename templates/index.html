@@ -212,6 +212,26 @@
                 }
             };
 
+             const checkGstRate = async (hsnCode, elementId) => {
+                try {
+                    const response = await fetch('/api/validate-hsn', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ hsnCode })
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        document.getElementById(elementId).textContent = `GST Rate: ${data.gstRate}%`;
+                    } else {
+                        document.getElementById(elementId).textContent = 'Error fetching GST rate';
+                    }
+                } catch (error) {
+                    console.error('Error validating HSN:', error);
+                    document.getElementById(elementId).textContent = 'Error fetching GST rate';
+                }
+            };
+
             const calculatePricing = async () => {
                 if (!productInfo.costPrice || !productInfo.weight) {
                     alert('Please enter cost price and weight for pricing calculation');
@@ -649,7 +669,8 @@
                                                     <div>
                                                         <h5 className="font-semibold text-gray-800">HSN Code:</h5>
                                                         <p className="text-gray-600">{version.hsnCode}</p>
-                                                        <p className="text-xs text-blue-600" id={`gst-info-${version.version}`}>
+                                                        <p className="text-xs text-blue-600 cursor-pointer hover:underline" 
+                                                           onClick={() => checkGstRate(version.hsnCode, `gst-info-amazon-${version.version}`)}>
                                                             Click to check GST rate
                                                         </p>
                                                     </div>
@@ -699,7 +720,8 @@
                                                     <div>
                                                         <h5 className="font-semibold text-gray-800">HSN Code:</h5>
                                                         <p className="text-gray-600">{version.hsnCode}</p>
-                                                        <p className="text-xs text-blue-600" id={`gst-info-${version.version}`}>
+                                                         <p className="text-xs text-blue-600 cursor-pointer hover:underline" 
+                                                           onClick={() => checkGstRate(version.hsnCode, `gst-info-flipkart-${version.version}`)}>
                                                             Click to check GST rate
                                                         </p>
                                                     </div>
@@ -749,7 +771,8 @@
                                                     <div>
                                                         <h5 className="font-semibold text-gray-800">HSN Code:</h5>
                                                         <p className="text-gray-600">{version.hsnCode}</p>
-                                                        <p className="text-xs text-blue-600" id={`gst-info-${version.version}`}>
+                                                        <p className="text-xs text-blue-600 cursor-pointer hover:underline" 
+                                                           onClick={() => checkGstRate(version.hsnCode, `gst-info-meesho-${version.version}`)}>
                                                             Click to check GST rate
                                                         </p>
                                                     </div>
