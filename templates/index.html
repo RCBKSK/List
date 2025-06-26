@@ -214,6 +214,14 @@
 
              const checkGstRate = async (hsnCode, elementId) => {
                 try {
+                    const gstElement = document.getElementById(elementId);
+                    if (!gstElement) {
+                        console.error('GST element not found:', elementId);
+                        return;
+                    }
+                    
+                    gstElement.textContent = 'Checking GST rate...';
+                    
                     const response = await fetch('/api/validate-hsn', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -222,13 +230,31 @@
 
                     const data = await response.json();
                     if (data.success) {
-                        document.getElementById(elementId).textContent = `GST Rate: ${data.gstRate}%`;
+                        let displayText = `GST Rate: ${data.gstRate}%`;
+                        
+                        if (data.source) {
+                            displayText += ` (${data.source})`;
+                        }
+                        
+                        if (data.chapterName) {
+                            displayText += `\nCategory: ${data.chapterName}`;
+                        }
+                        
+                        if (data.apiHsnCode && data.apiHsnCode !== hsnCode) {
+                            displayText += `\nMatched HSN: ${data.apiHsnCode}`;
+                        }
+                        
+                        gstElement.textContent = displayText;
+                        gstElement.style.whiteSpace = 'pre-line'; // Allow line breaks
                     } else {
-                        document.getElementById(elementId).textContent = 'Error fetching GST rate';
+                        gstElement.textContent = 'Error fetching GST rate';
                     }
                 } catch (error) {
                     console.error('Error validating HSN:', error);
-                    document.getElementById(elementId).textContent = 'Error fetching GST rate';
+                    const gstElement = document.getElementById(elementId);
+                    if (gstElement) {
+                        gstElement.textContent = 'Error fetching GST rate';
+                    }
                 }
             };
 

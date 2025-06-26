@@ -84,13 +84,95 @@ HSN_GST_MAPPING = {
     "9999": 0.18,  # Default rate for unknown items
 }
 
-def get_gst_rate_from_hsn(hsn_code):
+def get_gst_rate_from_hsn_api(hsn_code):
     """
-    Get GST rate based on HSN code
-    Returns tuple: (gst_rate, description)
+    Get GST rate from ClearTax Algolia API
+    Returns tuple: (gst_rate, description, hsn_data)
     """
     if not hsn_code:
-        return 0.18, "Default GST rate (18%)"
+        return 0.18, "Default GST rate (18%)", None
+    
+    hsn_clean = str(hsn_code).replace(" ", "").strip()
+    
+    try:
+        # ClearTax Algolia API request
+        api_url = "https://cleartax.in/f/content_search/algolia/algolia-search/"
+        
+        payload = {
+            "requests": [
+                {
+                    "indexName": "HSN_SAC_2021",
+                    "params": f"query={hsn_clean}&optionalWords={hsn_clean}&highlightPreTag=<strong>&highlightPostTag=</strong>&typoTolerance=false"
+                }
+            ]
+        }
+        
+        headers = {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+        
+        response = requests.post(api_url, json=payload, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            results = data.get('results', [])
+            
+            if results and len(results) > 0:
+                hits = results[0].get('hits', [])
+                
+                if hits:
+                    # Find exact or best match
+                    best_match = None
+                    exact_match = None
+                    
+                    for hit in hits:
+                        hit_hsn = hit.get('product_hsn_code', '')
+                        
+                        # Check for exact match
+                        if hit_hsn == hsn_clean or hit_hsn.startswith(hsn_clean):
+                            exact_match = hit
+                            break
+                        
+                        # Keep track of best partial match
+                        if not best_match and hsn_clean in hit_hsn:
+                            best_match = hit
+                    
+                    # Use exact match if found, otherwise best match
+                    selected_hit = exact_match or best_match or hits[0]
+                    
+                    product_rate = selected_hit.get('product_rate', '18%')
+                    product_description = selected_hit.get('product_description', '')
+                    chapter_name = selected_hit.get('chapter_name', '')
+                    product_hsn_code = selected_hit.get('product_hsn_code', hsn_clean)
+                    
+                    # Extract GST rate percentage
+                    gst_percentage = float(product_rate.replace('%', '')) if product_rate.replace('%', '').replace('.', '').isdigit() else 18.0
+                    gst_rate = gst_percentage / 100
+                    
+                    description = f"HSN {product_hsn_code}: {gst_percentage}% GST - {chapter_name}"
+                    
+                    return gst_rate, description, {
+                        'hsnCode': product_hsn_code,
+                        'gstRate': gst_percentage,
+                        'description': product_description,
+                        'chapterName': chapter_name,
+                        'source': 'ClearTax API'
+                    }
+    
+    except Exception as e:
+        print(f"Error fetching from ClearTax API: {e}")
+    
+    # Fallback to local mapping if API fails
+    return get_gst_rate_from_hsn_local(hsn_code)
+
+def get_gst_rate_from_hsn_local(hsn_code):
+    """
+    Get GST rate based on local HSN code mapping (fallback)
+    Returns tuple: (gst_rate, description, hsn_data)
+    """
+    if not hsn_code:
+        return 0.18, "Default GST rate (18%)", None
     
     # Clean HSN code - remove spaces and convert to string
     hsn_clean = str(hsn_code).replace(" ", "").strip()
@@ -98,14 +180,24 @@ def get_gst_rate_from_hsn(hsn_code):
     # Try exact match first
     if hsn_clean in HSN_GST_MAPPING:
         rate = HSN_GST_MAPPING[hsn_clean]
-        return rate, f"HSN {hsn_clean}: {rate * 100}% GST"
+        return rate, f"HSN {hsn_clean}: {rate * 100}% GST (Local)", {
+            'hsnCode': hsn_clean,
+            'gstRate': rate * 100,
+            'description': 'Local mapping',
+            'source': 'Local Database'
+        }
     
     # Try partial match for 4-digit HSN codes (match first 4 digits)
     if len(hsn_clean) >= 4:
         hsn_4digit = hsn_clean[:4]
         if hsn_4digit in HSN_GST_MAPPING:
             rate = HSN_GST_MAPPING[hsn_4digit]
-            return rate, f"HSN {hsn_4digit}: {rate * 100}% GST (matched from {hsn_clean})"
+            return rate, f"HSN {hsn_4digit}: {rate * 100}% GST (matched from {hsn_clean})", {
+                'hsnCode': hsn_4digit,
+                'gstRate': rate * 100,
+                'description': f'Matched from {hsn_clean}',
+                'source': 'Local Database'
+            }
     
     # Try partial match for 2-digit HSN codes (match first 2 digits)
     if len(hsn_clean) >= 2:
@@ -116,10 +208,28 @@ def get_gst_rate_from_hsn(hsn_code):
             # Use the most common rate for this category
             rates = [HSN_GST_MAPPING[hsn] for hsn in similar_hsns]
             common_rate = max(set(rates), key=rates.count)  # Most frequent rate
-            return common_rate, f"Category {hsn_2digit}: {common_rate * 100}% GST (estimated from {hsn_clean})"
+            return common_rate, f"Category {hsn_2digit}: {common_rate * 100}% GST (estimated from {hsn_clean})", {
+                'hsnCode': hsn_2digit,
+                'gstRate': common_rate * 100,
+                'description': f'Category estimate from {hsn_clean}',
+                'source': 'Local Database'
+            }
     
     # Default to 18% if no match found
-    return 0.18, f"HSN {hsn_clean}: 18% GST (default rate - unknown HSN)"
+    return 0.18, f"HSN {hsn_clean}: 18% GST (default rate - unknown HSN)", {
+        'hsnCode': hsn_clean,
+        'gstRate': 18,
+        'description': 'Default rate - unknown HSN',
+        'source': 'Default'
+    }
+
+def get_gst_rate_from_hsn(hsn_code):
+    """
+    Main function to get GST rate - tries API first, falls back to local mapping
+    Returns tuple: (gst_rate, description)
+    """
+    gst_rate, description, hsn_data = get_gst_rate_from_hsn_api(hsn_code)
+    return gst_rate, description
 
 def configure_gemini(api_key):
     global genai_api_key
@@ -677,14 +787,19 @@ def generate_listing():
         - Dimensions: {dimensions}
         - Cost Price: ₹{cost_price}
         
-        For HSN codes, please provide accurate 4-digit HSN codes based on the actual product category. Common examples:
-        - Electronics/Mobile: 8517 (18% GST)
-        - Clothing/Textiles: 6101-6302 (5-12% GST)
-        - Books: 4901 (0% GST)
+        For HSN codes, please provide accurate 4-6 digit HSN codes based on the actual product category. Common examples:
+        - Electronics/Mobile phones: 8517 (18% GST)
+        - Toys and games: 9503 (12% GST for most toys, 18% for electronic toys)
+        - Clothing/Textiles: 6101-6302 (5-12% GST depending on material and type)
+        - Books/Printed material: 4901-4911 (0-12% GST)
         - Furniture: 9403 (12% GST)
-        - Footwear: 6403 (18% GST)
+        - Footwear: 6403-6405 (5-18% GST depending on material)
         - Plastic items: 3926 (18% GST)
-        - Kitchen items: 7323 (18% GST)
+        - Kitchen items/utensils: 7323 (18% GST)
+        - Cosmetics: 3303-3307 (18% GST)
+        - Sports goods: 9506 (18% GST)
+        
+        Please analyze the product image carefully and assign the most appropriate HSN code based on the actual product category and material.
         
         Please provide a JSON response with the following structure:
         {{
@@ -1180,16 +1295,27 @@ def validate_hsn():
         if not hsn_code:
             return jsonify({'error': 'HSN code is required'}), 400
         
-        gst_rate, description = get_gst_rate_from_hsn(hsn_code)
+        gst_rate, description, hsn_data = get_gst_rate_from_hsn_api(hsn_code)
         
-        return jsonify({
+        response_data = {
             'success': True,
             'hsnCode': hsn_code,
             'gstRate': gst_rate * 100,
             'gstRateDecimal': gst_rate,
             'description': description,
             'isKnownHsn': hsn_code in HSN_GST_MAPPING
-        })
+        }
+        
+        # Add additional data if available from API
+        if hsn_data:
+            response_data.update({
+                'apiHsnCode': hsn_data.get('hsnCode'),
+                'chapterName': hsn_data.get('chapterName'),
+                'productDescription': hsn_data.get('description'),
+                'source': hsn_data.get('source')
+            })
+        
+        return jsonify(response_data)
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
