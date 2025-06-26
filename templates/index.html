@@ -363,10 +363,17 @@
                 }
             }, [productInfo.costPrice, productInfo.weight, productInfo.profitMargin, productInfo.platformCommission, productInfo.length, productInfo.width, productInfo.height]);
 
-             const generateProductImages = async () => {
+             const [generatedImages, setGeneratedImages] = useState(null);
+            const [imageGenerationLoading, setImageGenerationLoading] = useState(false);
+
+            const generateProductImages = async (actualGeneration = false) => {
                 if (!productInfo.name && !manualListing.title) {
                     alert('Please enter product information first');
                     return;
+                }
+
+                if (actualGeneration) {
+                    setImageGenerationLoading(true);
                 }
 
                 try {
@@ -376,24 +383,67 @@
                         body: JSON.stringify({
                             title: mode === 'ai' ? productInfo.name : manualListing.title,
                             brand: productInfo.brand || 'Generic',
-                            category: mode === 'manual' ? manualListing.category : 'General'
+                            category: mode === 'manual' ? manualListing.category : 'General',
+                            generateActual: actualGeneration
                         })
                     });
 
                     const result = await response.json();
                     if (result.success) {
                         const data = result.data;
-                        let message = "🎨 AI Image Generation Prompts:\n\n";
-                        data.prompts.forEach((prompt, index) => {
-                            message += `${index + 1}. ${prompt}\n`;
-                        });
-                        message += "\n📐 Recommended Dimensions:\n";
-                        Object.entries(data.suggested_dimensions).forEach(([platform, dims]) => {
-                            message += `${platform}: ${dims.width}x${dims.height}px\n`;
-                        });
-                        alert(message);
+                        
+                        if (actualGeneration) {
+                            setGeneratedImages(data);
+                            alert(`✅ Generated ${data.total_generated} images successfully!`);
+                        } else {
+                            let message = "🎨 AI Image Generation Prompts:\n\n";
+                            data.prompts.forEach((prompt, index) => {
+                                message += `${index + 1}. ${prompt}\n`;
+                            });
+                            message += "\n📐 Recommended Dimensions:\n";
+                            Object.entries(data.suggested_dimensions).forEach(([platform, dims]) => {
+                                message += `${platform}: ${dims.width}x${dims.height}px\n`;
+                            });
+                            alert(message);
+                        }
                     } else {
                         alert('Error: ' + result.error);
+                    }
+                } catch (error) {
+                    alert('Error: ' + error.message);
+                } finally {
+                    setImageGenerationLoading(false);
+                }
+            };
+
+            const downloadGeneratedImages = async () => {
+                if (!generatedImages || !generatedImages.generated_images) {
+                    alert('No generated images to download');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/download-generated-images', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            title: mode === 'ai' ? productInfo.name : manualListing.title,
+                            images: generatedImages.generated_images
+                        })
+                    });
+
+                    if (response.ok) {
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        a.download = `${(mode === 'ai' ? productInfo.name : manualListing.title).replace(' ', '_')}_images.zip`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                    } else {
+                        alert('Download failed');
                     }
                 } catch (error) {
                     alert('Error: ' + error.message);
@@ -1226,16 +1276,66 @@
                                 </div>
             )}
 
+            {/* Generated Images Display */}
+            {generatedImages && generatedImages.generated_images && (
+                <div className="glass-effect p-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-xl font-semibold text-white">🖼️ Generated Images</h3>
+                        <button
+                            onClick={downloadGeneratedImages}
+                            className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all font-semibold"
+                        >
+                            📥 Download All
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {generatedImages.generated_images.map((img, index) => (
+                            <div key={index} className="bg-white p-4 rounded-lg">
+                                {img.status === 'generated' ? (
+                                    <div>
+                                        <img 
+                                            src={img.image_base64} 
+                                            alt={`Generated ${index + 1}`} 
+                                            className="w-full h-48 object-cover rounded-lg mb-2"
+                                        />
+                                        <p className="text-xs text-gray-600 mb-2">{img.prompt}</p>
+                                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">✅ Generated</span>
+                                    </div>
+                                ) : (
+                                    <div className="h-48 bg-gray-200 rounded-lg flex items-center justify-center mb-2">
+                                        <span className="text-gray-500">❌ Failed</span>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                    {generatedImages.note && (
+                        <p className="text-white text-sm mt-4 opacity-75">
+                            ℹ️ {generatedImages.note}
+                        </p>
+                    )}
+                </div>
+            )}
+
             {/* Advanced Features Panel */}
             <div className="glass-effect p-6">
                 <h3 className="text-xl font-semibold text-white mb-4">🚀 Advanced Features</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <button
-                        onClick={generateProductImages}
-                        className="px-4 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-all font-semibold"
-                    >
-                        🎨 Generate Product Images
-                    </button>
+                    <div className="space-y-2">
+                        <button
+                            onClick={() => generateProductImages(false)}
+                            className="w-full px-4 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-all font-semibold"
+                        >
+                            🎨 Get Image Prompts
+                        </button>
+                        <button
+                            onClick={() => generateProductImages(true)}
+                            disabled={imageGenerationLoading}
+                            className="w-full px-4 py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-all font-semibold disabled:opacity-50"
+                        >
+                            {imageGenerationLoading ? '🔄 Generating Images...' : '🖼️ Generate Actual Images'}
+                        </button>
+                    </div>
                     <button
                         onClick={calculateComprehensiveGst}
                         className="px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all font-semibold"
