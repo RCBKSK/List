@@ -740,67 +740,91 @@
                                     </button>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <input
-                                        type="text"
-                                        placeholder="Product Name"
-                                        value={productInfo.name}
-                                        onChange={(e) => setProductInfo({...productInfo, name: e.target.value})}
-                                        className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <input
-                                        type="text"
-                                        placeholder="Brand"
-                                        value={productInfo.brand}
-                                        onChange={(e) => setProductInfo({...productInfo, brand: e.target.value})}
-                                        className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <input
-                                        type="number"
-                                        placeholder="Cost Price (₹)"
-                                        value={productInfo.costPrice}
-                                        onChange={(e) => setProductInfo({...productInfo, costPrice: e.target.value})}
-                                        className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <input
-                                        type="text"
-                                        placeholder="Dimensions"
-                                        value={productInfo.dimensions}
-                                        onChange={(e) => setProductInfo({...productInfo, dimensions: e.target.value})}
-                                        className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <input
-                                        type="number"
-                                        placeholder="Weight (kg)"
-                                        value={productInfo.weight}
-                                        onChange={(e) => setProductInfo({...productInfo, weight: e.target.value})}
-                                        className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                    />
+                                    <div>
+                                        <label className="block text-white text-sm font-semibold mb-1">Product Name</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Enter product name"
+                                            value={productInfo.name}
+                                            onChange={(e) => setProductInfo({...productInfo, name: e.target.value})}
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-white text-sm font-semibold mb-1">Brand</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Enter brand name"
+                                            value={productInfo.brand}
+                                            onChange={(e) => setProductInfo({...productInfo, brand: e.target.value})}
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-white text-sm font-semibold mb-1">Cost Price (₹)</label>
+                                        <input
+                                            type="number"
+                                            placeholder="Enter cost price"
+                                            value={productInfo.costPrice}
+                                            onChange={(e) => setProductInfo({...productInfo, costPrice: e.target.value})}
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-white text-sm font-semibold mb-1">Dimensions</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g., 10x8x5 cm"
+                                            value={productInfo.dimensions}
+                                            onChange={(e) => setProductInfo({...productInfo, dimensions: e.target.value})}
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-white text-sm font-semibold mb-1">Weight (kg)</label>
+                                        <input
+                                            type="number"
+                                            placeholder="Enter weight in kg"
+                                            value={productInfo.weight}
+                                            onChange={(e) => setProductInfo({...productInfo, weight: e.target.value})}
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="mt-4">
                                     <h4 className="text-white font-semibold mb-2">Dimensions (for shipping calculation)</h4>
                                     <div className="grid grid-cols-3 gap-4">
-                                        <input
-                                            type="number"
-                                            placeholder="Length (cm)"
-                                            value={productInfo.length}
-                                            onChange={(e) => setProductInfo({...productInfo, length: e.target.value})}
-                                            className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <input
-                                            type="number"
-                                            placeholder="Width (cm)"
-                                            value={productInfo.width}
-                                            onChange={(e) => setProductInfo({...productInfo, width: e.target.value})}
-                                            className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <input
-                                            type="number"
-                                            placeholder="Height (cm)"
-                                            value={productInfo.height}
-                                            onChange={(e) => setProductInfo({...productInfo, height: e.target.value})}
-                                            className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                        />
+                                        <div>
+                                            <label className="block text-white text-sm font-semibold mb-1">Length (cm)</label>
+                                            <input
+                                                type="number"
+                                                placeholder="Length"
+                                                value={productInfo.length}
+                                                onChange={(e) => setProductInfo({...productInfo, length: e.target.value})}
+                                                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-white text-sm font-semibold mb-1">Width (cm)</label>
+                                            <input
+                                                type="number"
+                                                placeholder="Width"
+                                                value={productInfo.width}
+                                                onChange={(e) => setProductInfo({...productInfo, width: e.target.value})}
+                                                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-white text-sm font-semibold mb-1">Height (cm)</label>
+                                            <input
+                                                type="number"
+                                                placeholder="Height"
+                                                value={productInfo.height}
+                                                onChange={(e) => setProductInfo({...productInfo, height: e.target.value})}
+                                                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
 
@@ -839,57 +863,74 @@
                                 <div className="glass-effect p-6">
                                     <h3 className="text-xl font-semibold text-white mb-4">✍️ Manual Entry</h3>
                                     <div className="space-y-4">
-                                        <input
-                                            type="text"
-                                                                           placeholder="Product Title (under 200 chars)"
-                                            value={manualListing.title}
-                                            onChange={(e) => setManualListing({...manualListing, title: e.target.value})}
-                                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                        />
-                                        <textarea
-                                            placeholder="Product Description (50-75 words)"
-                                            value={manualListing.description}
-                                            onChange={(e) => setManualListing({...manualListing, description: e.target.value})}
-                                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                            rows="3"
-                                        />
-                                        {Array.isArray(manualListing.bulletPoints) && manualListing.bulletPoints.map((bullet, index) => (
+                                        <div>
+                                            <label className="block text-white text-sm font-semibold mb-1">Product Title (under 200 chars)</label>
                                             <input
-                                                key={index}
                                                 type="text"
-                                                placeholder={`Bullet Point ${index + 1} (under 250 chars)`}
-                                                value={bullet}
-                                                onChange={(e) => {
-                                                    const newBullets = [...manualListing.bulletPoints];
-                                                    newBullets[index] = e.target.value;
-                                                    setManualListing({...manualListing, bulletPoints: newBullets});
-                                                }}
+                                                placeholder="Enter product title"
+                                                value={manualListing.title}
+                                                onChange={(e) => setManualListing({...manualListing, title: e.target.value})}
                                                 className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
                                             />
-                                        ))}
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <input
-                                                type="text"
-                                                placeholder="Category"
-                                                value={manualListing.category}
-                                                onChange={(e) => setManualListing({...manualListing, category: e.target.value})}
-                                                className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                            />
-                                            <input
-                                                type="text"
-                                                placeholder="HSN Code"
-                                                value={manualListing.hsnCode}
-                                                onChange={(e) => setManualListing({...manualListing, hsnCode: e.target.value})}
-                                                className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        </div>
+                                        <div>
+                                            <label className="block text-white text-sm font-semibold mb-1">Product Description (50-75 words)</label>
+                                            <textarea
+                                                placeholder="Enter product description"
+                                                value={manualListing.description}
+                                                onChange={(e) => setManualListing({...manualListing, description: e.target.value})}
+                                                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                                rows="3"
                                             />
                                         </div>
-                                        <input
-                                            type="text"
-                                            placeholder="Keywords (comma-separated)"
-                                            value={manualListing.keywords.join(', ')}
-                                            onChange={(e) => setManualListing({...manualListing, keywords: e.target.value.split(', ')})}
-                                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                        />
+                                        {Array.isArray(manualListing.bulletPoints) && manualListing.bulletPoints.map((bullet, index) => (
+                                            <div key={index}>
+                                                <label className="block text-white text-sm font-semibold mb-1">Bullet Point {index + 1} (under 250 chars)</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder={`Enter bullet point ${index + 1}`}
+                                                    value={bullet}
+                                                    onChange={(e) => {
+                                                        const newBullets = [...manualListing.bulletPoints];
+                                                        newBullets[index] = e.target.value;
+                                                        setManualListing({...manualListing, bulletPoints: newBullets});
+                                                    }}
+                                                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                        ))}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-white text-sm font-semibold mb-1">Category</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Enter category"
+                                                    value={manualListing.category}
+                                                    onChange={(e) => setManualListing({...manualListing, category: e.target.value})}
+                                                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-white text-sm font-semibold mb-1">HSN Code</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Enter HSN code"
+                                                    value={manualListing.hsnCode}
+                                                    onChange={(e) => setManualListing({...manualListing, hsnCode: e.target.value})}
+                                                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-white text-sm font-semibold mb-1">Keywords (comma-separated)</label>
+                                            <input
+                                                type="text"
+                                                placeholder="Enter keywords separated by commas"
+                                                value={manualListing.keywords.join(', ')}
+                                                onChange={(e) => setManualListing({...manualListing, keywords: e.target.value.split(', ')})}
+                                                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             )}
