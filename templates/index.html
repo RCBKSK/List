@@ -956,11 +956,11 @@
                                     <div className="space-y-2 text-white">
                                         <div className="flex justify-between">
                                             <span>Cost Price:</span>
-                                            <span>₹{priceBreakdown.costPrice}</span>
+                                            <span>₹{priceBreakdown.costPrice || '0'}</span>
                                         </div>
                                         <div className="flex justify-between">
-                                            <span>GST ({priceBreakdown.gstRate}) - HSN: {priceBreakdown.hsnCode}:</span>
-                                            <span>₹{priceBreakdown.gst}</span>
+                                            <span>GST ({priceBreakdown.gstRate || '0%'}) - HSN: {priceBreakdown.hsnCode || 'N/A'}:</span>
+                                            <span>₹{priceBreakdown.gst || '0'}</span>
                                         </div>
                                         {priceBreakdown.gstDescription && (
                                             <div className="text-xs text-gray-600 italic">
@@ -969,28 +969,28 @@
                                         )}
                                         <div className="flex justify-between">
                                             <span>Target Profit:</span>
-                                            <span>₹{priceBreakdown.targetProfit}</span>
+                                            <span>₹{priceBreakdown.targetProfit || '0'}</span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span>Shipping Cost:</span>
-                                            <span>₹{priceBreakdown.shippingCost}</span>
+                                            <span>₹{priceBreakdown.shippingCost || '0'}</span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span>Platform Commission:</span>
-                                            <span>₹{priceBreakdown.platformCommission.toFixed(2)}</span>
+                                            <span>₹{priceBreakdown.platformCommission ? priceBreakdown.platformCommission.toFixed(2) : '0.00'}</span>
                                         </div>
                                         <hr className="border-white border-opacity-30" />
                                         <div className="flex justify-between font-bold text-lg">
                                             <span>Selling Price:</span>
-                                            <span>₹{priceBreakdown.sellingPrice}</span>
+                                            <span>₹{priceBreakdown.sellingPrice || '0'}</span>
                                         </div>
                                         <div className="flex justify-between font-bold text-lg">
                                             <span>MRP:</span>
-                                            <span>₹{priceBreakdown.mrp}</span>
+                                            <span>₹{priceBreakdown.mrp || '0'}</span>
                                         </div>
                                         <div className="flex justify-between text-sm">
                                             <span>Volumetric Weight:</span>
-                                            <span>{priceBreakdown.volumetricWeight} kg</span>
+                                            <span>{priceBreakdown.volumetricWeight || '0'} kg</span>
                                         </div>
                                     </div>
                                 </div>
