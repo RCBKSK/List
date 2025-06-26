@@ -890,115 +890,150 @@ def export_listing(format):
         listing_versions = data.get('listing', [])
         pricing = data.get('pricing', {})
         
+        print(f"Export format: {format}")
+        print(f"Listing versions: {len(listing_versions) if isinstance(listing_versions, list) else 'single listing'}")
+        print(f"Pricing data: {pricing}")
+        
         # Handle both single listing (manual mode) and multiple versions (AI mode)
         if not isinstance(listing_versions, list):
             listing_versions = [listing_versions]
         
-        # Create temporary file
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=f'.{format}')
+        if not listing_versions or not listing_versions[0]:
+            return jsonify({'error': 'No listing data provided'}), 400
         
-        if format == 'amazon':
-            # Amazon Flat File format with multiple versions
-            amazon_data = {
-                'Version': [],
-                'Style': [],
-                'Product Title': [],
-                'Product Description': [],
-                'Bullet Point 1': [],
-                'Bullet Point 2': [],
-                'Bullet Point 3': [],
-                'Bullet Point 4': [],
-                'Bullet Point 5': [],
-                'Standard Price': [],
-                'Sale Price': [],
-                'Keywords': [],
-                'HSN Code': []
-            }
-            
-            for version in listing_versions:
-                amazon_data['Version'].append(version.get('version', 1))
-                amazon_data['Style'].append(version.get('style', 'Standard'))
-                amazon_data['Product Title'].append(version.get('title', ''))
-                amazon_data['Product Description'].append(version.get('description', ''))
-                bullets = version.get('bulletPoints', [])
-                for i in range(5):
-                    amazon_data[f'Bullet Point {i+1}'].append(bullets[i] if i < len(bullets) else '')
-                amazon_data['Standard Price'].append(pricing.get('amazon', {}).get('mrp', pricing.get('mrp', 0)))
-                amazon_data['Sale Price'].append(pricing.get('amazon', {}).get('sellingPrice', pricing.get('sellingPrice', 0)))
-                keywords = version.get('keywords', [])
-                amazon_data['Keywords'].append(', '.join(keywords) if isinstance(keywords, list) else str(keywords))
-                amazon_data['HSN Code'].append(version.get('hsnCode', ''))
-            
-            df = pd.DataFrame(amazon_data)
-            df.to_excel(temp_file.name, index=False)
-            
-        elif format == 'flipkart':
-            # Flipkart CSV format with multiple versions
-            flipkart_data = {
-                'Version': [],
-                'Style': [],
-                'Product Name': [],
-                'Product Description': [],
-                'Key Features': [],
-                'MRP': [],
-                'Selling Price': [],
-                'Category': [],
-                'HSN': [],
-                'Keywords': []
-            }
-            
-            for version in listing_versions:
-                flipkart_data['Version'].append(version.get('version', 1))
-                flipkart_data['Style'].append(version.get('style', 'Standard'))
-                flipkart_data['Product Name'].append(version.get('title', ''))
-                flipkart_data['Product Description'].append(version.get('description', ''))
-                flipkart_data['Key Features'].append('; '.join(version.get('bulletPoints', [])))
-                flipkart_data['MRP'].append(pricing.get('flipkart', {}).get('mrp', pricing.get('mrp', 0)))
-                flipkart_data['Selling Price'].append(pricing.get('flipkart', {}).get('sellingPrice', pricing.get('sellingPrice', 0)))
-                flipkart_data['Category'].append(version.get('category', ''))
-                flipkart_data['HSN'].append(version.get('hsnCode', ''))
-                keywords = version.get('keywords', [])
-                flipkart_data['Keywords'].append(', '.join(keywords) if isinstance(keywords, list) else str(keywords))
-            
-            df = pd.DataFrame(flipkart_data)
-            df.to_csv(temp_file.name, index=False)
-            
-        elif format == 'meesho':
-            # Meesho Excel format with multiple versions
-            meesho_data = {
-                'Version': [],
-                'Style': [],
-                'Product Title': [],
-                'Product Description': [],
-                'Features': [],
-                'MRP': [],
-                'Supplier Price': [],
-                'Category': [],
-                'HSN Code': [],
-                'Tags': []
-            }
-            
-            for version in listing_versions:
-                meesho_data['Version'].append(version.get('version', 1))
-                meesho_data['Style'].append(version.get('style', 'Standard'))
-                meesho_data['Product Title'].append(version.get('title', ''))
-                meesho_data['Product Description'].append(version.get('description', ''))
-                meesho_data['Features'].append('\n'.join(version.get('bulletPoints', [])))
-                meesho_data['MRP'].append(pricing.get('meesho', {}).get('mrp', pricing.get('mrp', 0)))
-                meesho_data['Supplier Price'].append(pricing.get('meesho', {}).get('sellingPrice', pricing.get('sellingPrice', 0)))
-                meesho_data['Category'].append(version.get('category', ''))
-                meesho_data['HSN Code'].append(version.get('hsnCode', ''))
-                keywords = version.get('keywords', [])
-                meesho_data['Tags'].append(', '.join(keywords) if isinstance(keywords, list) else str(keywords))
-            
-            df = pd.DataFrame(meesho_data)
-            df.to_excel(temp_file.name, index=False)
+        # Create temporary file with proper extension
+        file_extension = 'xlsx' if format in ['amazon', 'meesho'] else 'csv'
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_extension}')
+        temp_file.close()  # Close the file so pandas can write to it
         
-        return send_file(temp_file.name, as_attachment=True, 
-                        download_name=f'product_listing_{format}_versions_{datetime.now().strftime("%Y%m%d_%H%M%S")}.{"xlsx" if format in ["amazon", "meesho"] else "csv"}')
+        try:
+            if format == 'amazon':
+                # Amazon Flat File format with multiple versions
+                amazon_data = {
+                    'Version': [],
+                    'Style': [],
+                    'Product Title': [],
+                    'Product Description': [],
+                    'Bullet Point 1': [],
+                    'Bullet Point 2': [],
+                    'Bullet Point 3': [],
+                    'Bullet Point 4': [],
+                    'Bullet Point 5': [],
+                    'Standard Price': [],
+                    'Sale Price': [],
+                    'Keywords': [],
+                    'HSN Code': []
+                }
+                
+                for version in listing_versions:
+                    amazon_data['Version'].append(version.get('version', 1))
+                    amazon_data['Style'].append(version.get('style', 'Standard'))
+                    amazon_data['Product Title'].append(version.get('title', ''))
+                    amazon_data['Product Description'].append(version.get('description', ''))
+                    bullets = version.get('bulletPoints', [])
+                    for i in range(5):
+                        amazon_data[f'Bullet Point {i+1}'].append(bullets[i] if i < len(bullets) else '')
+                    amazon_data['Standard Price'].append(pricing.get('amazon', {}).get('mrp', pricing.get('mrp', 0)))
+                    amazon_data['Sale Price'].append(pricing.get('amazon', {}).get('sellingPrice', pricing.get('sellingPrice', 0)))
+                    keywords = version.get('keywords', [])
+                    amazon_data['Keywords'].append(', '.join(keywords) if isinstance(keywords, list) else str(keywords))
+                    amazon_data['HSN Code'].append(version.get('hsnCode', ''))
+                
+                df = pd.DataFrame(amazon_data)
+                with pd.ExcelWriter(temp_file.name, engine='openpyxl') as writer:
+                    df.to_excel(writer, index=False, sheet_name='Amazon Listings')
+                
+            elif format == 'flipkart':
+                # Flipkart CSV format with multiple versions
+                flipkart_data = {
+                    'Version': [],
+                    'Style': [],
+                    'Product Name': [],
+                    'Product Description': [],
+                    'Key Features': [],
+                    'MRP': [],
+                    'Selling Price': [],
+                    'Category': [],
+                    'HSN': [],
+                    'Keywords': []
+                }
+                
+                for version in listing_versions:
+                    flipkart_data['Version'].append(version.get('version', 1))
+                    flipkart_data['Style'].append(version.get('style', 'Standard'))
+                    flipkart_data['Product Name'].append(version.get('title', ''))
+                    flipkart_data['Product Description'].append(version.get('description', ''))
+                    flipkart_data['Key Features'].append('; '.join(version.get('bulletPoints', [])))
+                    flipkart_data['MRP'].append(pricing.get('flipkart', {}).get('mrp', pricing.get('mrp', 0)))
+                    flipkart_data['Selling Price'].append(pricing.get('flipkart', {}).get('sellingPrice', pricing.get('sellingPrice', 0)))
+                    flipkart_data['Category'].append(version.get('category', ''))
+                    flipkart_data['HSN'].append(version.get('hsnCode', ''))
+                    keywords = version.get('keywords', [])
+                    flipkart_data['Keywords'].append(', '.join(keywords) if isinstance(keywords, list) else str(keywords))
+                
+                df = pd.DataFrame(flipkart_data)
+                df.to_csv(temp_file.name, index=False, encoding='utf-8')
+                
+            elif format == 'meesho':
+                # Meesho Excel format with multiple versions
+                meesho_data = {
+                    'Version': [],
+                    'Style': [],
+                    'Product Title': [],
+                    'Product Description': [],
+                    'Features': [],
+                    'MRP': [],
+                    'Supplier Price': [],
+                    'Category': [],
+                    'HSN Code': [],
+                    'Tags': []
+                }
+                
+                for version in listing_versions:
+                    meesho_data['Version'].append(version.get('version', 1))
+                    meesho_data['Style'].append(version.get('style', 'Standard'))
+                    meesho_data['Product Title'].append(version.get('title', ''))
+                    meesho_data['Product Description'].append(version.get('description', ''))
+                    meesho_data['Features'].append('\n'.join(version.get('bulletPoints', [])))
+                    meesho_data['MRP'].append(pricing.get('meesho', {}).get('mrp', pricing.get('mrp', 0)))
+                    meesho_data['Supplier Price'].append(pricing.get('meesho', {}).get('sellingPrice', pricing.get('sellingPrice', 0)))
+                    meesho_data['Category'].append(version.get('category', ''))
+                    meesho_data['HSN Code'].append(version.get('hsnCode', ''))
+                    keywords = version.get('keywords', [])
+                    meesho_data['Tags'].append(', '.join(keywords) if isinstance(keywords, list) else str(keywords))
+                
+                df = pd.DataFrame(meesho_data)
+                with pd.ExcelWriter(temp_file.name, engine='openpyxl') as writer:
+                    df.to_excel(writer, index=False, sheet_name='Meesho Listings')
+            
+            print(f"File created successfully: {temp_file.name}")
+            
+            # Verify file exists and has content
+            if not os.path.exists(temp_file.name):
+                return jsonify({'error': 'Failed to create export file'}), 500
+            
+            file_size = os.path.getsize(temp_file.name)
+            if file_size == 0:
+                return jsonify({'error': 'Export file is empty'}), 500
+            
+            print(f"File size: {file_size} bytes")
+            
+            return send_file(temp_file.name, as_attachment=True, 
+                            download_name=f'product_listing_{format}_versions_{datetime.now().strftime("%Y%m%d_%H%M%S")}.{file_extension}',
+                            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' if file_extension == 'xlsx' else 'text/csv')
+        
+        except Exception as export_error:
+            print(f"Export error: {export_error}")
+            # Clean up temp file on error
+            if os.path.exists(temp_file.name):
+                os.unlink(temp_file.name)
+            raise export_error
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"General export error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Export failed: {str(e)}'}), 500
 
 @app.route('/api/configure-gemini', methods=['POST'])
 def configure_gemini_api():
