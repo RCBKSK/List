@@ -1048,8 +1048,15 @@ def export_listing(format):
                     bullets = version.get('bulletPoints', [])
                     for i in range(5):
                         amazon_data[f'Bullet Point {i+1}'].append(bullets[i] if i < len(bullets) else '')
-                    amazon_data['Standard Price'].append(pricing.get('amazon', {}).get('mrp', pricing.get('mrp', 0)))
-                    amazon_data['Sale Price'].append(pricing.get('amazon', {}).get('sellingPrice', pricing.get('sellingPrice', 0)))
+                    
+                    # Handle missing pricing data gracefully
+                    if pricing and pricing.get('amazon'):
+                        amazon_data['Standard Price'].append(pricing.get('amazon', {}).get('mrp', 0))
+                        amazon_data['Sale Price'].append(pricing.get('amazon', {}).get('sellingPrice', 0))
+                    else:
+                        amazon_data['Standard Price'].append(0)
+                        amazon_data['Sale Price'].append(0)
+                    
                     keywords = version.get('keywords', [])
                     amazon_data['Keywords'].append(', '.join(keywords) if isinstance(keywords, list) else str(keywords))
                     amazon_data['HSN Code'].append(version.get('hsnCode', ''))
@@ -1079,8 +1086,15 @@ def export_listing(format):
                     flipkart_data['Product Name'].append(version.get('title', ''))
                     flipkart_data['Product Description'].append(version.get('description', ''))
                     flipkart_data['Key Features'].append('; '.join(version.get('bulletPoints', [])))
-                    flipkart_data['MRP'].append(pricing.get('flipkart', {}).get('mrp', pricing.get('mrp', 0)))
-                    flipkart_data['Selling Price'].append(pricing.get('flipkart', {}).get('sellingPrice', pricing.get('sellingPrice', 0)))
+                    
+                    # Handle missing pricing data gracefully
+                    if pricing and pricing.get('flipkart'):
+                        flipkart_data['MRP'].append(pricing.get('flipkart', {}).get('mrp', 0))
+                        flipkart_data['Selling Price'].append(pricing.get('flipkart', {}).get('sellingPrice', 0))
+                    else:
+                        flipkart_data['MRP'].append(0)
+                        flipkart_data['Selling Price'].append(0)
+                    
                     flipkart_data['Category'].append(version.get('category', ''))
                     flipkart_data['HSN'].append(version.get('hsnCode', ''))
                     keywords = version.get('keywords', [])
@@ -1110,8 +1124,15 @@ def export_listing(format):
                     meesho_data['Product Title'].append(version.get('title', ''))
                     meesho_data['Product Description'].append(version.get('description', ''))
                     meesho_data['Features'].append('\n'.join(version.get('bulletPoints', [])))
-                    meesho_data['MRP'].append(pricing.get('meesho', {}).get('mrp', pricing.get('mrp', 0)))
-                    meesho_data['Supplier Price'].append(pricing.get('meesho', {}).get('sellingPrice', pricing.get('sellingPrice', 0)))
+                    
+                    # Handle missing pricing data gracefully
+                    if pricing and pricing.get('meesho'):
+                        meesho_data['MRP'].append(pricing.get('meesho', {}).get('mrp', 0))
+                        meesho_data['Supplier Price'].append(pricing.get('meesho', {}).get('sellingPrice', 0))
+                    else:
+                        meesho_data['MRP'].append(0)
+                        meesho_data['Supplier Price'].append(0)
+                    
                     meesho_data['Category'].append(version.get('category', ''))
                     meesho_data['HSN Code'].append(version.get('hsnCode', ''))
                     keywords = version.get('keywords', [])
