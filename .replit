@@ -1,5 +1,5 @@
-modules = ["web", "python-3.11"]
-run = "npm run start"
+entrypoint = "main.py"
+modules = ["python-3.11"]
 
 [nix]
 channel = "stable-24_05"
@@ -12,7 +12,7 @@ language = "python3"
 requiredFiles = [".replit", "replit.nix"]
 
 [deployment]
-run = ["sh", "-c", "npm run start"]
+run = ["python3", "main.py"]
 deploymentTarget = "cloudrun"
 
 [workflows]

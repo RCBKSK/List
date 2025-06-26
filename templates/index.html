@@ -3,43 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E-commerce Listing Generator</title>
+    <title>Product Listing Generator for Indian Marketplaces</title>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
-        .glass-effect {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-        }
-
         .gradient-bg {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
         }
-
-        .drag-zone {
-            border: 2px dashed #cbd5e0;
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
             transition: all 0.3s ease;
         }
-
-        .drag-zone:hover, .drag-zone.drag-over {
-            border-color: #4299e1;
-            background-color: rgba(66, 153, 225, 0.1);
+        .upload-area:hover {
+            border-color: #667eea;
+            background-color: #f8f9ff;
+        }
+        .upload-area.dragover {
+            border-color: #667eea;
+            background-color: #f0f4ff;
         }
     </style>
 </head>
-<body>
+<body class="gradient-bg min-h-screen">
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect } = React;
 
         function App() {
-            const [mode, setMode] = useState('ai');
+            const [mode, setMode] = useState('ai'); // 'ai' or 'manual'
             const [geminiApiKey, setGeminiApiKey] = useState('');
             const [isApiConfigured, setIsApiConfigured] = useState(false);
             const [selectedImage, setSelectedImage] = useState(null);
@@ -52,7 +56,6 @@
                 length: '',
                 width: '',
                 height: '',
-                weight: '',
                 profitMargin: 42.5,
                 platformCommission: 15
             });
@@ -69,8 +72,6 @@
             });
             const [productUrl, setProductUrl] = useState('');
             const [scrapingLoading, setScrapingLoading] = useState(false);
-            const [selectedPlatform, setSelectedPlatform] = useState('amazon');
-            const [selectedVersion, setSelectedVersion] = useState(1);
 
             const scrapeProductData = async () => {
                 if (!productUrl) {
@@ -100,7 +101,7 @@
                             width: data.dimensions?.width || prev.width,
                             height: data.dimensions?.height || prev.height
                         }));
-                        alert('Product information scraped successfully!');
+                        alert('Product data scraped successfully!');
                     } else {
                         alert('Error scraping product: ' + result.error);
                     }
@@ -151,6 +152,10 @@
             };
 
             const generateListing = async () => {
+                console.log('Generate button clicked');
+                console.log('Selected image:', selectedImage);
+                console.log('API configured:', isApiConfigured);
+
                 if (!selectedImage || !isApiConfigured) {
                     alert('Please upload an image and configure Gemini API');
                     return;
@@ -176,7 +181,6 @@
                         const result = await response.json();
                         if (result.success) {
                             setGeneratedListing(result.data);
-                            calculatePricing();
                         } else {
                             alert('Error generating listing: ' + result.error);
                         }
@@ -189,47 +193,31 @@
                 }
             };
 
-            const calculatePricing = async () => {
+            const calculatePrice = async () => {
                 try {
                     const response = await fetch('/api/calculate-price', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({
-                            costPrice: parseFloat(productInfo.costPrice) || 0,
-                            profitMargin: parseFloat(productInfo.profitMargin) || 42.5,
-                            weight: parseFloat(productInfo.weight) || 0,
-                            length: parseFloat(productInfo.length) || 0,
-                            width: parseFloat(productInfo.width) || 0,
-                            height: parseFloat(productInfo.height) || 0,
-                            marketplace: selectedPlatform
-                        }),
+                        body: JSON.stringify(productInfo),
                     });
 
                     const result = await response.json();
                     if (result.success) {
                         setPriceBreakdown(result.data);
                     } else {
-                        console.error('Error calculating pricing:', result.error);
+                        alert('Error calculating price: ' + result.error);
                     }
                 } catch (error) {
-                    console.error('Error:', error.message);
+                    alert('Error: ' + error.message);
                 }
             };
 
             const exportListing = async (format) => {
-                if (!generatedListing) {
-                    alert('Please generate a listing first');
-                    return;
-                }
-
-                const platformData = generatedListing[selectedPlatform];
-                const versionData = platformData ? platformData[selectedVersion - 1] : null;
-                const pricingData = priceBreakdown ? priceBreakdown[selectedPlatform] : null;
-
-                if (!versionData) {
-                    alert('No listing data available for the selected platform and version');
+                const listingData = mode === 'ai' ? generatedListing : manualListing;
+                if (!listingData) {
+                    alert('Please generate or enter listing data first');
                     return;
                 }
 
@@ -240,8 +228,8 @@
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({
-                            listing: versionData,
-                            pricing: pricingData
+                            listing: listingData,
+                            pricing: priceBreakdown
                         }),
                     });
 
@@ -251,369 +239,412 @@
                         const a = document.createElement('a');
                         a.style.display = 'none';
                         a.href = url;
-                        a.download = `product_listing_${format}.${format === 'flipkart' ? 'csv' : 'xlsx'}`;
+                        a.download = `product_listing_${format}_${new Date().toISOString().slice(0, 10)}.${format === 'flipkart' ? 'csv' : 'xlsx'}`;
                         document.body.appendChild(a);
                         a.click();
                         window.URL.revokeObjectURL(url);
                     } else {
-                        alert('Error exporting listing');
+                        alert('Export failed');
                     }
                 } catch (error) {
                     alert('Error: ' + error.message);
                 }
             };
 
-            return (
-                <div className="gradient-bg">
-                    <div className="container mx-auto px-4 py-8">
-                        <h1 className="text-4xl font-bold text-center text-white mb-8">
-                            🛍️ E-commerce Listing Generator
-                        </h1>
+            useEffect(() => {
+                if (productInfo.costPrice) {
+                    calculatePrice();
+                }
+            }, [productInfo.costPrice, productInfo.profitMargin, productInfo.platformCommission, productInfo.length, productInfo.width, productInfo.height]);
 
-                        <div className="max-w-6xl mx-auto">
-                            {/* Mode Selection */}
-                            <div className="glass-effect p-6 mb-6">
-                                <h3 className="text-xl font-semibold text-white mb-4 text-center">Choose Mode</h3>
-                                <div className="flex justify-center space-x-4">
+            return (
+                <div className="container mx-auto px-4 py-8">
+                    <div className="glass-effect p-8 mb-8">
+                        <h1 className="text-4xl font-bold text-white text-center mb-4">
+                            🛍️ Product Listing Generator
+                        </h1>
+                        <p className="text-white text-center opacity-90">
+                            Generate compelling product listings for Amazon, Flipkart & Meesho
+                        </p>
+                    </div>
+
+                    {/* Mode Toggle */}
+                    <div className="glass-effect p-6 mb-6">
+                        <div className="flex justify-center space-x-4">
+                            <button
+                                onClick={() => setMode('ai')}
+                                className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                                    mode === 'ai' 
+                                        ? 'bg-blue-600 text-white shadow-lg' 
+                                        : 'bg-white text-gray-700 hover:bg-blue-50'
+                                }`}
+                            >
+                                🤖 AI Mode (Gemini Vision)
+                            </button>
+                            <button
+                                onClick={() => setMode('manual')}
+                                className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                                    mode === 'manual' 
+                                        ? 'bg-green-600 text-white shadow-lg' 
+                                        : 'bg-white text-gray-700 hover:bg-green-50'
+                                }`}
+                            >
+                                ✍️ Manual Mode
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Gemini API Configuration */}
+                    {mode === 'ai' && (
+                        <div className="glass-effect p-6 mb-6">
+                            <h3 className="text-xl font-semibold text-white mb-4">🔑 Gemini API Configuration</h3>
+                            <div className="flex space-x-4">
+                                <input
+                                    type="password"
+                                    placeholder="Enter your Gemini API key"
+                                    value={geminiApiKey}
+                                    onChange={(e) => setGeminiApiKey(e.target.value)}
+                                    className="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                />
+                                <button
+                                    onClick={configureGemini}
+                                    disabled={!geminiApiKey}
+                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    Configure
+                                </button>
+                            </div>
+                            {isApiConfigured && (
+                                <p className="text-green-300 mt-2">✅ API configured successfully</p>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* Left Column - Input */}
+                        <div className="space-y-6">
+                            {/* Image Upload */}
+                            <div className="glass-effect p-6">
+                                <h3 className="text-xl font-semibold text-white mb-4">📸 Product Image</h3>
+                                <div
+                                    className="upload-area"
+                                    onDrop={handleDrop}
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onClick={() => document.getElementById('fileInput').click()}
+                                >
+                                    {imagePreview ? (
+                                        <img src={imagePreview} alt="Preview" className="max-h-64 mx-auto rounded-lg" />
+                                    ) : (
+                                        <div>
+                                            <p className="text-gray-600 mb-2">Click to upload or drag & drop</p>
+                                            <p className="text-sm text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                                        </div>
+                                    )}
+                                </div>
+                                <input
+                                    id="fileInput"
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => e.target.files[0] && handleImageUpload(e.target.files[0])}
+                                    className="hidden"
+                                />
+                            </div>
+
+                            {/* Product Information */}
+                            <div className="glass-effect p-6">
+                                <h3 className="text-xl font-semibold text-white mb-4">📝 Product Information</h3>
+
+                                <div className="mb-4">
+                                    <input
+                                        type="url"
+                                        placeholder="Enter Product URL to Scrape Data"
+                                        value={productUrl}
+                                        onChange={(e) => setProductUrl(e.target.value)}
+                                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                    />
                                     <button
-                                        onClick={() => setMode('ai')}
-                                        className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-                                            mode === 'ai' 
-                                                ? 'bg-blue-600 text-white shadow-lg' 
-                                                : 'bg-white text-gray-700 hover:bg-blue-50'
-                                        }`}
+                                        onClick={scrapeProductData}
+                                        disabled={!productUrl || scrapingLoading}
+                                        className="mt-2 w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
                                     >
-                                        🤖 AI Mode (Gemini Vision)
+                                        {scrapingLoading ? 'Scraping...' : 'Scrape Product Data'}
                                     </button>
-                                    <button
-                                        onClick={() => setMode('manual')}
-                                        className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-                                            mode === 'manual' 
-                                                ? 'bg-green-600 text-white shadow-lg' 
-                                                : 'bg-white text-gray-700 hover:bg-green-50'
-                                        }`}
-                                    >
-                                        ✍️ Manual Mode
-                                    </button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <input
+                                        type="text"
+                                        placeholder="Product Name"
+                                        value={productInfo.name}
+                                        onChange={(e) => setProductInfo({...productInfo, name: e.target.value})}
+                                        className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="Brand"
+                                        value={productInfo.brand}
+                                        onChange={(e) => setProductInfo({...productInfo, brand: e.target.value})}
+                                        className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <input
+                                        type="number"
+                                        placeholder="Cost Price (₹)"
+                                        value={productInfo.costPrice}
+                                        onChange={(e) => setProductInfo({...productInfo, costPrice: e.target.value})}
+                                        className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="Dimensions"
+                                        value={productInfo.dimensions}
+                                        onChange={(e) => setProductInfo({...productInfo, dimensions: e.target.value})}
+                                        className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+
+                                <div className="mt-4">
+                                    <h4 className="text-white font-semibold mb-2">Dimensions (for shipping calculation)</h4>
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <input
+                                            type="number"
+                                            placeholder="Length (cm)"
+                                            value={productInfo.length}
+                                            onChange={(e) => setProductInfo({...productInfo, length: e.target.value})}
+                                            className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <input
+                                            type="number"
+                                            placeholder="Width (cm)"
+                                            value={productInfo.width}
+                                            onChange={(e) => setProductInfo({...productInfo, width: e.target.value})}
+                                            className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <input
+                                            type="number"
+                                            placeholder="Height (cm)"
+                                            value={productInfo.height}
+                                            onChange={(e) => setProductInfo({...productInfo, height: e.target.value})}
+                                            className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-white text-sm font-semibold">Profit Margin (%)</label>
+                                        <input
+                                            type="number"
+                                            value={productInfo.profitMargin}
+                                            onChange={(e) => setProductInfo({...productInfo, profitMargin: e.target.value})}
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-white text-sm font-semibold">Platform Commission (%)</label>
+                                        <input
+                                            type="number"
+                                            value={productInfo.platformCommission}
+                                            onChange={(e) => setProductInfo({...productInfo, platformCommission: e.target.value})}
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Gemini API Configuration */}
-                            {mode === 'ai' && !isApiConfigured && (
-                                <div className="glass-effect p-6 mb-6">
-                                    <h3 className="text-xl font-semibold text-white mb-4">🔑 Gemini API Configuration</h3>
-                                    <div className="flex space-x-4">
+                            {/* Generate/Manual Entry */}
+                            {mode === 'ai' ? (
+                                <button
+                                    onClick={generateListing}
+                                    disabled={!selectedImage || !isApiConfigured || loading}
+                                    className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 transition-all"
+                                >
+                                    {loading ? '🔄 Generating...' : '🚀 Generate Listing with AI'}
+                                </button>
+                            ) : (
+                                <div className="glass-effect p-6">
+                                    <h3 className="text-xl font-semibold text-white mb-4">✍️ Manual Entry</h3>
+                                    <div className="space-y-4">
                                         <input
-                                            type="password"
-                                            placeholder="Enter your Gemini API key"
-                                            value={geminiApiKey}
-                                            onChange={(e) => setGeminiApiKey(e.target.value)}
-                                            className="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                            type="text"
+                                            placeholder="Product Title (under 200 chars)"
+                                            value={manualListing.title}
+                                            onChange={(e) => setManualListing({...manualListing, title: e.target.value})}
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
                                         />
-                                        <button
-                                            onClick={configureGemini}
-                                            disabled={!geminiApiKey}
-                                            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                                        >
-                                            Configure
-                                        </button>
+                                        <textarea
+                                            placeholder="Product Description (50-75 words)"
+                                            value={manualListing.description}
+                                            onChange={(e) => setManualListing({...manualListing, description: e.target.value})}
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                            rows="3"
+                                        />
+                                        {manualListing.bulletPoints.map((bullet, index) => (
+                                            <input
+                                                key={index}
+                                                type="text"
+                                                placeholder={`Bullet Point ${index + 1} (under 250 chars)`}
+                                                value={bullet}
+                                                onChange={(e) => {
+                                                    const newBullets = [...manualListing.bulletPoints];
+                                                    newBullets[index] = e.target.value;
+                                                    setManualListing({...manualListing, bulletPoints: newBullets});
+                                                }}
+                                                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        ))}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <input
+                                                type="text"
+                                                placeholder="Category"
+                                                value={manualListing.category}
+                                                onChange={(e) => setManualListing({...manualListing, category: e.target.value})}
+                                                className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="HSN Code"
+                                                value={manualListing.hsnCode}
+                                                onChange={(e) => setManualListing({...manualListing, hsnCode: e.target.value})}
+                                                className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            placeholder="Keywords (comma-separated)"
+                                            value={manualListing.keywords.join(', ')}
+                                            onChange={(e) => setManualListing({...manualListing, keywords: e.target.value.split(', ')})}
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
                                     </div>
-                                    {isApiConfigured && (
-                                        <p className="text-green-300 mt-2">✅ API configured successfully</p>
-                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Right Column - Output */}
+                        <div className="space-y-6">
+                            {/* Price Breakdown */}
+                            {priceBreakdown && (
+                                <div className="glass-effect p-6">
+                                    <h3 className="text-xl font-semibold text-white mb-4">💰 Price Breakdown</h3>
+                                    <div className="space-y-2 text-white">
+                                        <div className="flex justify-between">
+                                            <span>Cost Price:</span>
+                                            <span>₹{priceBreakdown.costPrice}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>GST (5%):</span>
+                                            <span>₹{priceBreakdown.gst}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Target Profit:</span>
+                                            <span>₹{priceBreakdown.targetProfit}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Shipping Cost:</span>
+                                            <span>₹{priceBreakdown.shippingCost}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Platform Commission:</span>
+                                            <span>₹{priceBreakdown.platformCommission.toFixed(2)}</span>
+                                        </div>
+                                        <hr className="border-white border-opacity-30" />
+                                        <div className="flex justify-between font-bold text-lg">
+                                            <span>Selling Price:</span>
+                                            <span>₹{priceBreakdown.sellingPrice}</span>
+                                        </div>
+                                        <div className="flex justify-between font-bold text-lg">
+                                            <span>MRP:</span>
+                                            <span>₹{priceBreakdown.mrp}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span>Volumetric Weight:</span>
+                                            <span>{priceBreakdown.volumetricWeight} kg</span>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                {/* Left Column - Input */}
-                                <div className="space-y-6">
-                                    {/* Product URL Scraping */}
-                                    <div className="glass-effect p-6">
-                                        <h3 className="text-xl font-semibold text-white mb-4">🔗 Product URL Scraper</h3>
-                                        <div className="space-y-4">
-                                            <input
-                                                type="url"
-                                                placeholder="Paste Amazon/Flipkart/Meesho product URL"
-                                                value={productUrl}
-                                                onChange={(e) => setProductUrl(e.target.value)}
-                                                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                            />
-                                            <button
-                                                onClick={scrapeProductData}
-                                                disabled={scrapingLoading}
-                                                className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
-                                            >
-                                                {scrapingLoading ? 'Scraping...' : 'Extract Product Data'}
-                                            </button>
+                            {/* Generated/Manual Listing */}
+                            {(generatedListing || (mode === 'manual' && manualListing.title)) && (
+                                <div className="glass-effect p-6">
+                                    <h3 className="text-xl font-semibold text-white mb-4">📋 Product Listing</h3>
+                                    <div className="bg-white p-4 rounded-lg space-y-4">
+                                        <div>
+                                            <h4 className="font-semibold text-gray-800">Title:</h4>
+                                            <p className="text-gray-600">{mode === 'ai' ? generatedListing?.title : manualListing.title}</p>
                                         </div>
-                                    </div>
 
-                                    {/* Image Upload */}
-                                    {mode === 'ai' && (
-                                        <div className="glass-effect p-6">
-                                            <h3 className="text-xl font-semibold text-white mb-4">📸 Product Image</h3>
-                                            <div 
-                                                className="drag-zone p-8 rounded-lg text-center cursor-pointer"
-                                                onDrop={handleDrop}
-                                                onDragOver={(e) => e.preventDefault()}
-                                                onClick={() => document.getElementById('imageInput').click()}
-                                            >
-                                                {imagePreview ? (
-                                                    <img src={imagePreview} alt="Preview" className="max-w-full max-h-64 mx-auto rounded-lg" />
-                                                ) : (
-                                                    <div className="text-gray-500">
-                                                        <p className="text-lg mb-2">📁 Drop image here or click to upload</p>
-                                                        <p className="text-sm">Supports JPG, PNG, GIF</p>
-                                                    </div>
-                                                )}
+                                        <div>
+                                            <h4 className="font-semibold text-gray-800">Bullet Points:</h4>
+                                            <ul className="list-disc list-inside text-gray-600">
+                                                {(mode === 'ai' ? generatedListing?.bulletPoints : manualListing.bulletPoints)?.map((bullet, index) => (
+                                                    bullet && <li key={index}>{bullet}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+
+                                        <div>
+                                            <h4 className="font-semibold text-gray-800">Description:</h4>
+                                            <p className="text-gray-600">{mode === 'ai' ? generatedListing?.description : manualListing.description}</p>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <h4 className="font-semibold text-gray-800">Category:</h4>
+                                                <p className="text-gray-600">{mode === 'ai' ? generatedListing?.category : manualListing.category}</p>
                                             </div>
-                                            <input
-                                                id="imageInput"
-                                                type="file"
-                                                accept="image/*"
-                                                onChange={(e) => handleImageUpload(e.target.files[0])}
-                                                className="hidden"
-                                            />
+                                            <div>
+                                                <h4 className="font-semibold text-gray-800">HSN Code:</h4>
+                                                <p className="text-gray-600">{mode === 'ai' ? generatedListing?.hsnCode : manualListing.hsnCode}</p>
+                                            </div>
                                         </div>
-                                    )}
 
-                                    {/* Product Information */}
-                                    <div className="glass-effect p-6">
-                                        <h3 className="text-xl font-semibold text-white mb-4">📋 Product Information</h3>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <input
-                                                type="text"
-                                                placeholder="Product Name"
-                                                value={productInfo.name}
-                                                onChange={(e) => setProductInfo(prev => ({...prev, name: e.target.value}))}
-                                                className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                            />
-                                            <input
-                                                type="text"
-                                                placeholder="Brand"
-                                                value={productInfo.brand}
-                                                onChange={(e) => setProductInfo(prev => ({...prev, brand: e.target.value}))}
-                                                className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                            />
-                                            <input
-                                                type="number"
-                                                placeholder="Cost Price (₹)"
-                                                value={productInfo.costPrice}
-                                                onChange={(e) => setProductInfo(prev => ({...prev, costPrice: e.target.value}))}
-                                                className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                            />
-                                            <input
-                                                type="number"
-                                                placeholder="Weight (kg)"
-                                                value={productInfo.weight}
-                                                onChange={(e) => setProductInfo(prev => ({...prev, weight: e.target.value}))}
-                                                className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                            />
-                                            <input
-                                                type="number"
-                                                placeholder="Length (cm)"
-                                                value={productInfo.length}
-                                                onChange={(e) => setProductInfo(prev => ({...prev, length: e.target.value}))}
-                                                className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                            />
-                                            <input
-                                                type="number"
-                                                placeholder="Width (cm)"
-                                                value={productInfo.width}
-                                                onChange={(e) => setProductInfo(prev => ({...prev, width: e.target.value}))}
-                                                className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                            />
-                                            <input
-                                                type="number"
-                                                placeholder="Height (cm)"
-                                                value={productInfo.height}
-                                                onChange={(e) => setProductInfo(prev => ({...prev, height: e.target.value}))}
-                                                className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                            />
-                                            <input
-                                                type="number"
-                                                placeholder="Profit Margin (%)"
-                                                value={productInfo.profitMargin}
-                                                onChange={(e) => setProductInfo(prev => ({...prev, profitMargin: e.target.value}))}
-                                                className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                            />
+                                        <div>
+                                            <h4 className="font-semibold text-gray-800">Keywords:</h4>
+                                            <p className="text-gray-600">
+                                                {mode === 'ai' 
+                                                    ? (Array.isArray(generatedListing?.keywords) ? generatedListing.keywords.join(', ') : (generatedListing?.keywords || ''))
+                                                    : (Array.isArray(manualListing.keywords) ? manualListing.keywords.join(', ') : '')
+                                                }
+                                            </p>
                                         </div>
                                     </div>
+                                </div>
+                            )}
 
-                                    {/* Generate Button */}
-                                    {mode === 'ai' && (
+                            {/* Export Options */}
+                            {(generatedListing || (mode === 'manual' && manualListing.title)) && (
+                                <div className="glass-effect p-6">
+                                    <h3 className="text-xl font-semibold text-white mb-4">📤 Export Options</h3>
+                                    <div className="space-y-3">
                                         <button
-                                            onClick={generateListing}
-                                            disabled={loading || !selectedImage || !isApiConfigured}
-                                            className={`w-full py-3 px-6 rounded-lg font-semibold text-white transition-all ${
-                                                loading || !selectedImage || !isApiConfigured
-                                                    ? 'bg-gray-500 cursor-not-allowed'
-                                                    : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg'
-                                            }`}
+                                            onClick={() => exportListing('amazon')}
+                                            className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all font-semibold"
                                         >
-                                            {loading ? '🔄 Generating Listings...' : '🚀 Generate All Marketplace Listings'}
+                                            📊 Export for Amazon (Excel)
                                         </button>
-                                    )}
+                                        <button
+                                            onClick={() => exportListing('flipkart')}
+                                            className="w-full px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all font-semibold"
+                                        >
+                                            📋 Export for Flipkart (CSV)
+                                        </button>
+                                        <button
+                                            onClick={() => exportListing('meesho')}
+                                            className="w-full px-4 py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-all font-semibold"
+                                        >
+                                            📈 Export for Meesho (Excel)
+                                        </button>
+                                    </div>
                                 </div>
-
-                                {/* Right Column - Results */}
-                                <div className="space-y-6">
-                                    {/* Platform and Version Selection */}
-                                    {generatedListing && (
-                                        <div className="glass-effect p-6">
-                                            <h3 className="text-xl font-semibold text-white mb-4">📊 Select Platform & Version</h3>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <select
-                                                    value={selectedPlatform}
-                                                    onChange={(e) => setSelectedPlatform(e.target.value)}
-                                                    className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                                >
-                                                    <option value="amazon">Amazon</option>
-                                                    <option value="flipkart">Flipkart</option>
-                                                    <option value="meesho">Meesho</option>
-                                                </select>
-                                                <select
-                                                    value={selectedVersion}
-                                                    onChange={(e) => setSelectedVersion(parseInt(e.target.value))}
-                                                    className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-                                                >
-                                                    <option value={1}>Version 1</option>
-                                                    <option value={2}>Version 2</option>
-                                                    <option value={3}>Version 3</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Generated Listing Display */}
-                                    {generatedListing && generatedListing[selectedPlatform] && (
-                                        <div className="glass-effect p-6">
-                                            <h3 className="text-xl font-semibold text-white mb-4">
-                                                📝 {selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)} Listing - Version {selectedVersion}
-                                            </h3>
-                                            {(() => {
-                                                const versionData = generatedListing[selectedPlatform][selectedVersion - 1];
-                                                return (
-                                                    <div className="space-y-4 text-white">
-                                                        <div>
-                                                            <h4 className="font-semibold text-blue-300">Style: {versionData.style}</h4>
-                                                        </div>
-                                                        <div>
-                                                            <h4 className="font-semibold text-blue-300">Title:</h4>
-                                                            <p className="text-sm bg-white/20 p-3 rounded">{versionData.title}</p>
-                                                        </div>
-                                                        <div>
-                                                            <h4 className="font-semibold text-blue-300">Key Features:</h4>
-                                                            <ul className="text-sm bg-white/20 p-3 rounded">
-                                                                {versionData.bulletPoints.map((point, idx) => (
-                                                                    <li key={idx} className="mb-1">• {point}</li>
-                                                                ))}
-                                                            </ul>
-                                                        </div>
-                                                        <div>
-                                                            <h4 className="font-semibold text-blue-300">Description:</h4>
-                                                            <p className="text-sm bg-white/20 p-3 rounded">{versionData.description}</p>
-                                                        </div>
-                                                        <div className="grid grid-cols-2 gap-4">
-                                                            <div>
-                                                                <h4 className="font-semibold text-blue-300">Category:</h4>
-                                                                <p className="text-sm bg-white/20 p-2 rounded">{versionData.category}</p>
-                                                            </div>
-                                                            <div>
-                                                                <h4 className="font-semibold text-blue-300">HSN Code:</h4>
-                                                                <p className="text-sm bg-white/20 p-2 rounded">{versionData.hsnCode}</p>
-                                                            </div>
-                                                        </div>
-                                                        <div>
-                                                            <h4 className="font-semibold text-blue-300">Keywords:</h4>
-                                                            <p className="text-sm bg-white/20 p-3 rounded">{versionData.keywords.join(', ')}</p>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })()}
-                                        </div>
-                                    )}
-
-                                    {/* Price Breakdown */}
-                                    {priceBreakdown && priceBreakdown[selectedPlatform] && (
-                                        <div className="glass-effect p-6">
-                                            <h3 className="text-xl font-semibold text-white mb-4">💰 Price Breakdown - {selectedPlatform.charAt(0).toUpperCase() + selectedPlatform.slice(1)}</h3>
-                                            {(() => {
-                                                const pricing = priceBreakdown[selectedPlatform];
-                                                return (
-                                                    <div className="space-y-3 text-white">
-                                                        <div className="flex justify-between">
-                                                            <span>Cost Price:</span>
-                                                            <span>₹{pricing.costPrice}</span>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span>GST (5%):</span>
-                                                            <span>₹{pricing.gst}</span>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span>Target Profit:</span>
-                                                            <span>₹{pricing.targetProfit}</span>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span>Shipping Cost:</span>
-                                                            <span>₹{pricing.shippingCost}</span>
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span>Platform Commission ({pricing.platformCommissionRate}):</span>
-                                                            <span>₹{pricing.platformCommission}</span>
-                                                        </div>
-                                                        <div className="border-t pt-2 flex justify-between font-bold">
-                                                            <span>Selling Price:</span>
-                                                            <span>₹{pricing.sellingPrice}</span>
-                                                        </div>
-                                                        <div className="flex justify-between font-bold text-green-300">
-                                                            <span>Suggested MRP:</span>
-                                                            <span>₹{pricing.mrp}</span>
-                                                        </div>
-                                                        <div className="text-sm text-gray-300 mt-2">
-                                                            <p>Weight: {pricing.weight} kg | Volumetric: {pricing.volumetricWeight} kg</p>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })()}
-                                        </div>
-                                    )}
-
-                                    {/* Export Options */}
-                                    {generatedListing && (
-                                        <div className="glass-effect p-6">
-                                            <h3 className="text-xl font-semibold text-white mb-4">📥 Export Listing</h3>
-                                            <div className="grid grid-cols-3 gap-4">
-                                                <button
-                                                    onClick={() => exportListing('amazon')}
-                                                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm"
-                                                >
-                                                    Amazon (.xlsx)
-                                                </button>
-                                                <button
-                                                    onClick={() => exportListing('flipkart')}
-                                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-                                                >
-                                                    Flipkart (.csv)
-                                                </button>
-                                                <button
-                                                    onClick={() => exportListing('meesho')}
-                                                    className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 text-sm"
-                                                >
-                                                    Meesho (.xlsx)
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                            )}
                         </div>
                     </div>
                 </div>
             );
         }
 
-        ReactDOM.render(<App />, document.getElementById('root'));
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
