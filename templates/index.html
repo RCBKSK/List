@@ -259,9 +259,11 @@
                 }
             };
 
-            const calculatePricing = async () => {
+            const calculatePricing = async (showAlert = false) => {
                 if (!productInfo.costPrice || !productInfo.weight) {
-                    alert('Please enter cost price and weight for pricing calculation');
+                    if (showAlert) {
+                        alert('Please enter cost price and weight for pricing calculation');
+                    }
                     return;
                 }
 
@@ -342,10 +344,10 @@
             };
 
             useEffect(() => {
-                if (productInfo.costPrice) {
-                    calculatePricing();
+                if (productInfo.costPrice && productInfo.weight) {
+                    calculatePricing(false);
                 }
-            }, [productInfo.costPrice, productInfo.profitMargin, productInfo.platformCommission, productInfo.length, productInfo.width, productInfo.height]);
+            }, [productInfo.costPrice, productInfo.weight, productInfo.profitMargin, productInfo.platformCommission, productInfo.length, productInfo.width, productInfo.height]);
 
              const generateProductImages = async () => {
                 if (!productInfo.name && !manualListing.title) {
