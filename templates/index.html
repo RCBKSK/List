@@ -1,210 +1,77 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E-commerce Listing Generator</title>
+    <title>Product Listing Generator for Indian Marketplaces</title>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
-        .drag-drop-area {
-            border: 2px dashed #007bff;
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(10px);
             border-radius: 10px;
-            padding: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 2rem;
             text-align: center;
-            background-color: #f8f9fa;
             cursor: pointer;
             transition: all 0.3s ease;
         }
-        .drag-drop-area:hover {
-            background-color: #e9ecef;
-            border-color: #0056b3;
+        .upload-area:hover {
+            border-color: #667eea;
+            background-color: #f8f9ff;
         }
-        .drag-drop-area.dragover {
-            background-color: #cce5ff;
-            border-color: #0056b3;
-        }
-        .preview-image {
-            max-width: 300px;
-            max-height: 300px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        .version-card {
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            transition: box-shadow 0.3s ease;
-        }
-        .version-card:hover {
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        .marketplace-tab {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-        }
-        .marketplace-tab.active {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        }
-        .loading-spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #3498db;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .price-breakdown {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 10px 0;
-        }
-        .step-indicator {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 30px;
-        }
-        .step {
-            flex: 1;
-            text-align: center;
-            position: relative;
-        }
-        .step::before {
-            content: '';
-            position: absolute;
-            top: 15px;
-            left: 50%;
-            width: 100%;
-            height: 2px;
-            background: #dee2e6;
-            z-index: -1;
-        }
-        .step:first-child::before {
-            display: none;
-        }
-        .step-number {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background: #dee2e6;
-            color: #6c757d;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 8px;
-        }
-        .step.active .step-number {
-            background: #007bff;
-            color: white;
-        }
-        .step.completed .step-number {
-            background: #28a745;
-            color: white;
-        }
-        .manual-form {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        .btn-outline-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,123,255,0.3);
-        }
-        .export-button {
-            margin: 5px;
-            min-width: 120px;
+        .upload-area.dragover {
+            border-color: #667eea;
+            background-color: #f0f4ff;
         }
     </style>
 </head>
-<body>
+<body class="gradient-bg min-h-screen">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect } = React;
 
         function App() {
-            const [currentStep, setCurrentStep] = useState(1);
             const [mode, setMode] = useState('ai'); // 'ai' or 'manual'
-            const [image, setImage] = useState(null);
-            const [imagePreview, setImagePreview] = useState(null);
+            const [geminiApiKey, setGeminiApiKey] = useState('');
+            const [isApiConfigured, setIsApiConfigured] = useState(false);
+            const [selectedImage, setSelectedImage] = useState(null);
+            const [imagePreview, setImagePreview] = useState('');
             const [productInfo, setProductInfo] = useState({
                 name: '',
                 brand: '',
                 dimensions: '',
                 costPrice: '',
-                weight: '',
                 length: '',
                 width: '',
                 height: '',
-                hsnCode: ''
+                profitMargin: 42.5,
+                platformCommission: 15
             });
+            const [generatedListing, setGeneratedListing] = useState(null);
+            const [priceBreakdown, setPriceBreakdown] = useState(null);
+            const [loading, setLoading] = useState(false);
             const [manualListing, setManualListing] = useState({
                 title: '',
+                bulletPoints: ['', '', ''],
                 description: '',
-                bulletPoints: ['', '', '', '', ''],
-                keywords: '',
                 category: '',
-                hsnCode: ''
+                hsnCode: '',
+                keywords: []
             });
-            const [listings, setListings] = useState({});
-            const [pricing, setPricing] = useState({});
-            const [loading, setLoading] = useState(false);
-            const [geminiApiKey, setGeminiApiKey] = useState('');
-            const [activeMarketplace, setActiveMarketplace] = useState('amazon');
             const [productUrl, setProductUrl] = useState('');
-            const fileInputRef = useRef(null);
-
-            const steps = [
-                { number: 1, title: 'Mode & Input', icon: 'fas fa-upload' },
-                { number: 2, title: 'Product Info', icon: 'fas fa-info-circle' },
-                { number: 3, title: 'Generate/Create', icon: 'fas fa-magic' },
-                { number: 4, title: 'Pricing', icon: 'fas fa-dollar-sign' },
-                { number: 5, title: 'Export', icon: 'fas fa-download' }
-            ];
-
-            const marketplaces = ['amazon', 'flipkart', 'meesho'];
-
-            useEffect(() => {
-                // Load saved API key
-                const savedApiKey = localStorage.getItem('geminiApiKey');
-                if (savedApiKey) {
-                    setGeminiApiKey(savedApiKey);
-                }
-            }, []);
-
-            const handleImageUpload = (file) => {
-                if (file && file.type.startsWith('image/')) {
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        setImage(e.target.result);
-                        setImagePreview(e.target.result);
-                    };
-                    reader.readAsDataURL(file);
-                }
-            };
-
-            const handleDrop = (e) => {
-                e.preventDefault();
-                const file = e.dataTransfer.files[0];
-                handleImageUpload(file);
-            };
-
-            const handleFileSelect = (e) => {
-                const file = e.target.files[0];
-                handleImageUpload(file);
-            };
+            const [scrapingLoading, setScrapingLoading] = useState(false);
 
             const scrapeProductData = async () => {
                 if (!productUrl) {
@@ -212,12 +79,14 @@
                     return;
                 }
 
-                setLoading(true);
+                setScrapingLoading(true);
                 try {
                     const response = await fetch('/api/scrape-product', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ url: productUrl })
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ url: productUrl }),
                     });
 
                     const result = await response.json();
@@ -228,750 +97,800 @@
                             name: data.title || prev.name,
                             brand: data.brand || prev.brand,
                             weight: data.weight || prev.weight,
-                            length: data.dimensions.length || prev.length,
-                            width: data.dimensions.width || prev.width,
-                            height: data.dimensions.height || prev.height
+                            length: data.dimensions?.length || prev.length,
+                            width: data.dimensions?.width || prev.width,
+                            height: data.dimensions?.height || prev.height
                         }));
                         alert('Product data scraped successfully!');
                     } else {
-                        alert('Failed to scrape product data: ' + result.error);
+                        alert('Error scraping product: ' + result.error);
                     }
                 } catch (error) {
-                    alert('Error scraping product data: ' + error.message);
+                    alert('Error: ' + error.message);
                 } finally {
-                    setLoading(false);
+                    setScrapingLoading(false);
                 }
             };
 
-            const generateListings = async () => {
-                if (mode === 'ai' && (!image || !geminiApiKey)) {
-                    alert('Please upload an image and configure Gemini API key');
+            const configureGemini = async () => {
+                try {
+                    const response = await fetch('/api/configure-gemini', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ apiKey: geminiApiKey }),
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        setIsApiConfigured(true);
+                        alert('Gemini API configured successfully!');
+                    } else {
+                        alert('Error configuring API: ' + result.error);
+                    }
+                } catch (error) {
+                    alert('Error: ' + error.message);
+                }
+            };
+
+            const handleImageUpload = (file) => {
+                setSelectedImage(file);
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    setImagePreview(e.target.result);
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const handleDrop = (e) => {
+                e.preventDefault();
+                const file = e.dataTransfer.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    handleImageUpload(file);
+                }
+            };
+
+            const generateListing = async () => {
+                console.log('Generate button clicked');
+                console.log('Selected image:', selectedImage);
+                console.log('API configured:', isApiConfigured);
+
+                if (!selectedImage || !isApiConfigured) {
+                    alert('Please upload an image and configure Gemini API');
                     return;
                 }
 
                 setLoading(true);
                 try {
-                    if (mode === 'ai') {
-                        // Configure Gemini API
-                        await fetch('/api/configure-gemini', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ apiKey: geminiApiKey })
-                        });
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        const base64Image = e.target.result;
 
-                        // Save API key
-                        localStorage.setItem('geminiApiKey', geminiApiKey);
-
-                        // Generate AI listings
                         const response = await fetch('/api/generate-listing', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
                             body: JSON.stringify({
-                                image: image,
+                                image: base64Image,
                                 productInfo: productInfo
-                            })
+                            }),
                         });
 
                         const result = await response.json();
                         if (result.success) {
-                            setListings(result.data);
-                            setCurrentStep(4);
+                            setGeneratedListing(result.data);
                         } else {
-                            alert('Failed to generate listings: ' + result.error);
+                            alert('Error generating listing: ' + result.error);
                         }
-                    } else {
-                        // Manual mode - use manual listing data
-                        const singleListing = {
-                            version: 1,
-                            style: 'Manual',
-                            ...manualListing
-                        };
-                        setListings({ [activeMarketplace]: [singleListing] });
-                        setCurrentStep(4);
-                    }
+                        setLoading(false);
+                    };
+                    reader.readAsDataURL(selectedImage);
                 } catch (error) {
-                    alert('Error generating listings: ' + error.message);
-                } finally {
+                    alert('Error: ' + error.message);
                     setLoading(false);
                 }
             };
 
+            const validateHsn = async (hsnCode) => {
+                try {
+                    const response = await fetch('/api/validate-hsn', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ hsnCode })
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        return data;
+                    }
+                    return null;
+                } catch (error) {
+                    console.error('Error validating HSN:', error);
+                    return null;
+                }
+            };
+
+             const checkGstRate = async (hsnCode, elementId) => {
+                try {
+                    const gstElement = document.getElementById(elementId);
+                    if (!gstElement) {
+                        console.error('GST element not found:', elementId);
+                        return;
+                    }
+                    
+                    gstElement.textContent = 'Checking GST rate...';
+                    
+                    const response = await fetch('/api/validate-hsn', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ hsnCode })
+                    });
+
+                    const data = await response.json();
+                    if (data.success) {
+                        let displayText = `GST Rate: ${data.gstRate}%`;
+                        
+                        if (data.source) {
+                            displayText += ` (${data.source})`;
+                        }
+                        
+                        if (data.chapterName) {
+                            displayText += `\nCategory: ${data.chapterName}`;
+                        }
+                        
+                        if (data.apiHsnCode && data.apiHsnCode !== hsnCode) {
+                            displayText += `\nMatched HSN: ${data.apiHsnCode}`;
+                        }
+                        
+                        gstElement.textContent = displayText;
+                        gstElement.style.whiteSpace = 'pre-line'; // Allow line breaks
+                    } else {
+                        gstElement.textContent = 'Error fetching GST rate';
+                    }
+                } catch (error) {
+                    console.error('Error validating HSN:', error);
+                    const gstElement = document.getElementById(elementId);
+                    if (gstElement) {
+                        gstElement.textContent = 'Error fetching GST rate';
+                    }
+                }
+            };
+
             const calculatePricing = async () => {
-                if (!productInfo.costPrice || !productInfo.hsnCode) {
-                    alert('Please enter cost price and HSN code');
+                if (!productInfo.costPrice || !productInfo.weight) {
+                    alert('Please enter cost price and weight for pricing calculation');
                     return;
                 }
 
-                setLoading(true);
+                // Use HSN code from manual listing if in manual mode, otherwise use default
+                const hsnCode = mode === 'manual' ? manualListing.hsnCode : '9999';
+
                 try {
                     const response = await fetch('/api/calculate-price', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            costPrice: parseFloat(productInfo.costPrice),
-                            profitMargin: 42.5,
-                            hsnCode: productInfo.hsnCode,
-                            weight: parseFloat(productInfo.weight) || 0,
-                            length: parseFloat(productInfo.length) || 0,
-                            width: parseFloat(productInfo.width) || 0,
-                            height: parseFloat(productInfo.height) || 0
+                            costPrice: productInfo.costPrice,
+                            weight: productInfo.weight,
+                            length: productInfo.length,
+                            width: productInfo.width,
+                            height: productInfo.height,
+                            profitMargin: productInfo.profitMargin,
+                            platformCommission: productInfo.platformCommission,
+                            hsnCode: hsnCode
                         })
                     });
 
-                    const result = await response.json();
-                    if (result.success) {
-                        setPricing(result.data);
-                        setCurrentStep(5);
+                    const data = await response.json();
+                    if (data.success) {
+                        setPriceBreakdown(data.data);
                     } else {
-                        alert('Failed to calculate pricing: ' + result.error);
+                        alert('Error calculating pricing: ' + data.error);
                     }
                 } catch (error) {
                     alert('Error calculating pricing: ' + error.message);
-                } finally {
-                    setLoading(false);
                 }
             };
 
-            const exportData = async (format) => {
-                setLoading(true);
+            const exportListing = async (format) => {
+                let listingData;
+                if (mode === 'ai') {
+                    if (!generatedListing) {
+                        alert('Please generate listing data first');
+                        return;
+                    }
+                    listingData = generatedListing[format] || generatedListing.amazon || [];
+                } else {
+                    if (!manualListing.title) {
+                        alert('Please enter listing data first');
+                        return;
+                    }
+                    listingData = [manualListing]; // Wrap manual listing in array for consistency
+                }
+
                 try {
-                    const exportData = mode === 'ai' ? listings[format] : [manualListing];
-                    
                     const response = await fetch(`/api/export/${format}`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
                         body: JSON.stringify({
-                            listing: exportData,
-                            pricing: pricing
-                        })
+                            listing: listingData,
+                            pricing: priceBreakdown
+                        }),
                     });
 
                     if (response.ok) {
                         const blob = await response.blob();
                         const url = window.URL.createObjectURL(blob);
                         const a = document.createElement('a');
+                        a.style.display = 'none';
                         a.href = url;
-                        a.download = `${format}_listing_${Date.now()}.${format === 'flipkart' ? 'csv' : 'xlsx'}`;
+                        a.download = `product_listing_${format}_${new Date().toISOString().slice(0, 10)}.${format === 'flipkart' ? 'csv' : 'xlsx'}`;
+                        document.body.appendChild(a);
                         a.click();
                         window.URL.revokeObjectURL(url);
                     } else {
-                        const error = await response.json();
-                        alert('Export failed: ' + error.error);
+                        alert('Export failed');
                     }
                 } catch (error) {
-                    alert('Error exporting data: ' + error.message);
-                } finally {
-                    setLoading(false);
+                    alert('Error: ' + error.message);
                 }
             };
 
-            const updateBulletPoint = (index, value) => {
-                const newBulletPoints = [...manualListing.bulletPoints];
-                newBulletPoints[index] = value;
-                setManualListing(prev => ({ ...prev, bulletPoints: newBulletPoints }));
-            };
+            useEffect(() => {
+                if (productInfo.costPrice) {
+                    calculatePrice();
+                }
+            }, [productInfo.costPrice, productInfo.profitMargin, productInfo.platformCommission, productInfo.length, productInfo.width, productInfo.height]);
 
-            const renderStepIndicator = () => (
-                <div className="step-indicator">
-                    {steps.map(step => (
-                        <div key={step.number} className={`step ${currentStep >= step.number ? 'active' : ''} ${currentStep > step.number ? 'completed' : ''}`}>
-                            <div className="step-number">
-                                {currentStep > step.number ? <i className="fas fa-check"></i> : step.number}
-                            </div>
-                            <small>{step.title}</small>
-                        </div>
-                    ))}
-                </div>
-            );
-
-            const renderModeSelection = () => (
-                <div className="card">
-                    <div className="card-header">
-                        <h5><i className="fas fa-cog me-2"></i>Choose Your Mode</h5>
+            return (
+                <div className="container mx-auto px-4 py-8">
+                    <div className="glass-effect p-8 mb-8">
+                        <h1 className="text-4xl font-bold text-white text-center mb-4">
+                            🛍️ Product Listing Generator
+                        </h1>
+                        <p className="text-white text-center opacity-90">
+                            Generate compelling product listings for Amazon, Flipkart & Meesho
+                        </p>
                     </div>
-                    <div className="card-body">
-                        <div className="row">
-                            <div className="col-md-6 mb-3">
-                                <div className={`card h-100 ${mode === 'ai' ? 'border-primary' : ''}`} 
-                                     onClick={() => setMode('ai')} style={{cursor: 'pointer'}}>
-                                    <div className="card-body text-center">
-                                        <i className="fas fa-robot fa-3x text-primary mb-3"></i>
-                                        <h5>AI Mode</h5>
-                                        <p>Upload product image and let AI generate listings automatically</p>
-                                        <div className="form-check">
-                                            <input className="form-check-input" type="radio" name="mode" 
-                                                   checked={mode === 'ai'} onChange={() => setMode('ai')} />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="col-md-6 mb-3">
-                                <div className={`card h-100 ${mode === 'manual' ? 'border-primary' : ''}`} 
-                                     onClick={() => setMode('manual')} style={{cursor: 'pointer'}}>
-                                    <div className="card-body text-center">
-                                        <i className="fas fa-edit fa-3x text-success mb-3"></i>
-                                        <h5>Manual Mode</h5>
-                                        <p>Create listings manually with full control over content</p>
-                                        <div className="form-check">
-                                            <input className="form-check-input" type="radio" name="mode" 
-                                                   checked={mode === 'manual'} onChange={() => setMode('manual')} />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+
+                    {/* Mode Toggle */}
+                    <div className="glass-effect p-6 mb-6">
+                        <div className="flex justify-center space-x-4">
+                            <button
+                                onClick={() => setMode('ai')}
+                                className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                                    mode === 'ai' 
+                                        ? 'bg-blue-600 text-white shadow-lg' 
+                                        : 'bg-white text-gray-700 hover:bg-blue-50'
+                                }`}
+                            >
+                                🤖 AI Mode (Gemini Vision)
+                            </button>
+                            <button
+                                onClick={() => setMode('manual')}
+                                className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+                                    mode === 'manual' 
+                                        ? 'bg-green-600 text-white shadow-lg' 
+                                        : 'bg-white text-gray-700 hover:bg-green-50'
+                                }`}
+                            >
+                                ✍️ Manual Mode
+                            </button>
                         </div>
+                    </div>
 
-                        {mode === 'ai' && (
-                            <div className="mt-4">
-                                <div className="row">
-                                    <div className="col-md-8">
-                                        <label className="form-label">Gemini API Key</label>
-                                        <input
-                                            type="password"
-                                            className="form-control"
-                                            value={geminiApiKey}
-                                            onChange={(e) => setGeminiApiKey(e.target.value)}
-                                            placeholder="Enter your Gemini API key"
-                                        />
-                                        <small className="text-muted">
-                                            Get your API key from <a href="https://makersuite.google.com/app/apikey" target="_blank">Google AI Studio</a>
-                                        </small>
-                                    </div>
+                    {/* Gemini API Configuration */}
+                    {mode === 'ai' && (
+                        <div className="glass-effect p-6 mb-6">
+                            <h3 className="text-xl font-semibold text-white mb-4">🔑 Gemini API Configuration</h3>
+                            <div className="flex space-x-4">
+                                <input
+                                    type="password"
+                                    placeholder="Enter your Gemini API key"
+                                    value={geminiApiKey}
+                                    onChange={(e) => setGeminiApiKey(e.target.value)}
+                                    className="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                />
+                                <button
+                                    onClick={configureGemini}
+                                    disabled={!geminiApiKey}
+                                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    Configure
+                                </button>
+                            </div>
+                            {isApiConfigured && (
+                                <p className="text-green-300 mt-2">✅ API configured successfully</p>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* Left Column - Input */}
+                        <div className="space-y-6">
+                            {/* Image Upload */}
+                            <div className="glass-effect p-6">
+                                <h3 className="text-xl font-semibold text-white mb-4">📸 Product Image</h3>
+                                <div
+                                    className="upload-area"
+                                    onDrop={handleDrop}
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onClick={() => document.getElementById('fileInput').click()}
+                                >
+                                    {imagePreview ? (
+                                        <img src={imagePreview} alt="Preview" className="max-h-64 mx-auto rounded-lg" />
+                                    ) : (
+                                        <div>
+                                            <p className="text-gray-600 mb-2">Click to upload or drag & drop</p>
+                                            <p className="text-sm text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                                        </div>
+                                    )}
                                 </div>
+                                <input
+                                    id="fileInput"
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => e.target.files[0] && handleImageUpload(e.target.files[0])}
+                                    className="hidden"
+                                />
+                            </div>
 
-                                <div className="mt-4">
-                                    <h6>Product Image Upload</h6>
-                                    <div 
-                                        className="drag-drop-area"
-                                        onDrop={handleDrop}
-                                        onDragOver={(e) => e.preventDefault()}
-                                        onClick={() => fileInputRef.current?.click()}
-                                    >
-                                        {imagePreview ? (
-                                            <div>
-                                                <img src={imagePreview} alt="Product" className="preview-image mb-3" />
-                                                <p>Click to change image</p>
-                                            </div>
-                                        ) : (
-                                            <div>
-                                                <i className="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
-                                                <p>Drag & drop an image here or click to select</p>
-                                                <small className="text-muted">Supports JPG, PNG, GIF</small>
-                                            </div>
-                                        )}
-                                    </div>
+                            {/* Product Information */}
+                            <div className="glass-effect p-6">
+                                <h3 className="text-xl font-semibold text-white mb-4">📝 Product Information</h3>
+
+                                <div className="mb-4">
                                     <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleFileSelect}
-                                        style={{ display: 'none' }}
+                                        type="url"
+                                        placeholder="Enter Product URL to Scrape Data"
+                                        value={productUrl}
+                                        onChange={(e) => setProductUrl(e.target.value)}
+                                        className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <button
+                                        onClick={scrapeProductData}
+                                        disabled={!productUrl || scrapingLoading}
+                                        className="mt-2 w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                                    >
+                                        {scrapingLoading ? 'Scraping...' : 'Scrape Product Data'}
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <input
+                                        type="text"
+                                        placeholder="Product Name"
+                                        value={productInfo.name}
+                                        onChange={(e) => setProductInfo({...productInfo, name: e.target.value})}
+                                        className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="Brand"
+                                        value={productInfo.brand}
+                                        onChange={(e) => setProductInfo({...productInfo, brand: e.target.value})}
+                                        className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <input
+                                        type="number"
+                                        placeholder="Cost Price (₹)"
+                                        value={productInfo.costPrice}
+                                        onChange={(e) => setProductInfo({...productInfo, costPrice: e.target.value})}
+                                        className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="Dimensions"
+                                        value={productInfo.dimensions}
+                                        onChange={(e) => setProductInfo({...productInfo, dimensions: e.target.value})}
+                                        className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>
 
                                 <div className="mt-4">
-                                    <h6>Auto-fill from URL (Optional)</h6>
-                                    <div className="row">
-                                        <div className="col-md-8">
+                                    <h4 className="text-white font-semibold mb-2">Dimensions (for shipping calculation)</h4>
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <input
+                                            type="number"
+                                            placeholder="Length (cm)"
+                                            value={productInfo.length}
+                                            onChange={(e) => setProductInfo({...productInfo, length: e.target.value})}
+                                            className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <input
+                                            type="number"
+                                            placeholder="Width (cm)"
+                                            value={productInfo.width}
+                                            onChange={(e) => setProductInfo({...productInfo, width: e.target.value})}
+                                            className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <input
+                                            type="number"
+                                            placeholder="Height (cm)"
+                                            value={productInfo.height}
+                                            onChange={(e) => setProductInfo({...productInfo, height: e.target.value})}
+                                            className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-white text-sm font-semibold">Profit Margin (%)</label>
+                                        <input
+                                            type="number"
+                                            value={productInfo.profitMargin}
+                                            onChange={(e) => setProductInfo({...productInfo, profitMargin: e.target.value})}
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-white text-sm font-semibold">Platform Commission (%)</label>
+                                        <input
+                                            type="number"
+                                            value={productInfo.platformCommission}
+                                            onChange={(e) => setProductInfo({...productInfo, platformCommission: e.target.value})}
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Generate/Manual Entry */}
+                            {mode === 'ai' ? (
+                                <button
+                                    onClick={generateListing}
+                                    disabled={!selectedImage || !isApiConfigured || loading}
+                                    className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 transition-all"
+                                >
+                                    {loading ? '🔄 Generating...' : '🚀 Generate Listing with AI'}
+                                </button>
+                            ) : (
+                                <div className="glass-effect p-6">
+                                    <h3 className="text-xl font-semibold text-white mb-4">✍️ Manual Entry</h3>
+                                    <div className="space-y-4">
+                                        <input
+                                            type="text"
+                                            placeholder="Product Title (under 200 chars)"
+                                            value={manualListing.title}
+                                            onChange={(e) => setManualListing({...manualListing, title: e.target.value})}
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                        <textarea
+                                            placeholder="Product Description (50-75 words)"
+                                            value={manualListing.description}
+                                            onChange={(e) => setManualListing({...manualListing, description: e.target.value})}
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                            rows="3"
+                                        />
+                                        {manualListing.bulletPoints.map((bullet, index) => (
                                             <input
-                                                type="url"
-                                                className="form-control"
-                                                value={productUrl}
-                                                onChange={(e) => setProductUrl(e.target.value)}
-                                                placeholder="Enter product URL (Amazon, Flipkart, etc.)"
+                                                key={index}
+                                                type="text"
+                                                placeholder={`Bullet Point ${index + 1} (under 250 chars)`}
+                                                value={bullet}
+                                                onChange={(e) => {
+                                                    const newBullets = [...manualListing.bulletPoints];
+                                                    newBullets[index] = e.target.value;
+                                                    setManualListing({...manualListing, bulletPoints: newBullets});
+                                                }}
+                                                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        ))}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <input
+                                                type="text"
+                                                placeholder="Category"
+                                                value={manualListing.category}
+                                                onChange={(e) => setManualListing({...manualListing, category: e.target.value})}
+                                                className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="HSN Code"
+                                                value={manualListing.hsnCode}
+                                                onChange={(e) => setManualListing({...manualListing, hsnCode: e.target.value})}
+                                                className="px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
                                             />
                                         </div>
-                                        <div className="col-md-4">
-                                            <button 
-                                                className="btn btn-outline-primary"
-                                                onClick={scrapeProductData}
-                                                disabled={loading || !productUrl}
-                                            >
-                                                <i className="fas fa-search me-2"></i>
-                                                Scrape Data
-                                            </button>
+                                        <input
+                                            type="text"
+                                            placeholder="Keywords (comma-separated)"
+                                            value={manualListing.keywords.join(', ')}
+                                            onChange={(e) => setManualListing({...manualListing, keywords: e.target.value.split(', ')})}
+                                            className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Right Column - Output */}
+                        <div className="space-y-6">
+                            {/* Price Breakdown */}
+                            {priceBreakdown && (
+                                <div className="glass-effect p-6">
+                                    <h3 className="text-xl font-semibold text-white mb-4">💰 Price Breakdown</h3>
+                                    <div className="space-y-2 text-white">
+                                        <div className="flex justify-between">
+                                            <span>Cost Price:</span>
+                                            <span>₹{priceBreakdown.costPrice}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>GST ({priceBreakdown.gstRate}) - HSN: {priceBreakdown.hsnCode}:</span>
+                                            <span>₹{priceBreakdown.gst}</span>
+                                        </div>
+                                        {priceBreakdown.gstDescription && (
+                                            <div className="text-xs text-gray-600 italic">
+                                                {priceBreakdown.gstDescription}
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between">
+                                            <span>Target Profit:</span>
+                                            <span>₹{priceBreakdown.targetProfit}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Shipping Cost:</span>
+                                            <span>₹{priceBreakdown.shippingCost}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Platform Commission:</span>
+                                            <span>₹{priceBreakdown.platformCommission.toFixed(2)}</span>
+                                        </div>
+                                        <hr className="border-white border-opacity-30" />
+                                        <div className="flex justify-between font-bold text-lg">
+                                            <span>Selling Price:</span>
+                                            <span>₹{priceBreakdown.sellingPrice}</span>
+                                        </div>
+                                        <div className="flex justify-between font-bold text-lg">
+                                            <span>MRP:</span>
+                                            <span>₹{priceBreakdown.mrp}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span>Volumetric Weight:</span>
+                                            <span>{priceBreakdown.volumetricWeight} kg</span>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        <div className="mt-4 text-end">
-                            <button 
-                                className="btn btn-primary"
-                                onClick={() => setCurrentStep(2)}
-                                disabled={mode === 'ai' && (!geminiApiKey || !image)}
-                            >
-                                Next <i className="fas fa-arrow-right ms-2"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            );
-
-            const renderProductInfo = () => (
-                <div className="card">
-                    <div className="card-header">
-                        <h5><i className="fas fa-info-circle me-2"></i>Product Information</h5>
-                    </div>
-                    <div className="card-body">
-                        <div className="row">
-                            <div className="col-md-6 mb-3">
-                                <label className="form-label">Product Name</label>
-                                <input
-                                    type="text"
-                                    className="form-control"
-                                    value={productInfo.name}
-                                    onChange={(e) => setProductInfo(prev => ({ ...prev, name: e.target.value }))}
-                                    placeholder="Enter product name"
-                                />
-                            </div>
-                            <div className="col-md-6 mb-3">
-                                <label className="form-label">Brand</label>
-                                <input
-                                    type="text"
-                                    className="form-control"
-                                    value={productInfo.brand}
-                                    onChange={(e) => setProductInfo(prev => ({ ...prev, brand: e.target.value }))}
-                                    placeholder="Enter brand name"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="row">
-                            <div className="col-md-6 mb-3">
-                                <label className="form-label">Cost Price (₹)</label>
-                                <input
-                                    type="number"
-                                    className="form-control"
-                                    value={productInfo.costPrice}
-                                    onChange={(e) => setProductInfo(prev => ({ ...prev, costPrice: e.target.value }))}
-                                    placeholder="Enter cost price"
-                                />
-                            </div>
-                            <div className="col-md-6 mb-3">
-                                <label className="form-label">Weight (kg)</label>
-                                <input
-                                    type="number"
-                                    step="0.001"
-                                    className="form-control"
-                                    value={productInfo.weight}
-                                    onChange={(e) => setProductInfo(prev => ({ ...prev, weight: e.target.value }))}
-                                    placeholder="Enter weight in kg"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="row">
-                            <div className="col-md-4 mb-3">
-                                <label className="form-label">Length (cm)</label>
-                                <input
-                                    type="number"
-                                    className="form-control"
-                                    value={productInfo.length}
-                                    onChange={(e) => setProductInfo(prev => ({ ...prev, length: e.target.value }))}
-                                    placeholder="Length"
-                                />
-                            </div>
-                            <div className="col-md-4 mb-3">
-                                <label className="form-label">Width (cm)</label>
-                                <input
-                                    type="number"
-                                    className="form-control"
-                                    value={productInfo.width}
-                                    onChange={(e) => setProductInfo(prev => ({ ...prev, width: e.target.value }))}
-                                    placeholder="Width"
-                                />
-                            </div>
-                            <div className="col-md-4 mb-3">
-                                <label className="form-label">Height (cm)</label>
-                                <input
-                                    type="number"
-                                    className="form-control"
-                                    value={productInfo.height}
-                                    onChange={(e) => setProductInfo(prev => ({ ...prev, height: e.target.value }))}
-                                    placeholder="Height"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="row">
-                            <div className="col-md-6 mb-3">
-                                <label className="form-label">HSN Code</label>
-                                <input
-                                    type="text"
-                                    className="form-control"
-                                    value={productInfo.hsnCode}
-                                    onChange={(e) => setProductInfo(prev => ({ ...prev, hsnCode: e.target.value }))}
-                                    placeholder="Enter HSN code (e.g., 8517)"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="mt-4 d-flex justify-content-between">
-                            <button 
-                                className="btn btn-outline-secondary"
-                                onClick={() => setCurrentStep(1)}
-                            >
-                                <i className="fas fa-arrow-left me-2"></i>Back
-                            </button>
-                            <button 
-                                className="btn btn-primary"
-                                onClick={() => setCurrentStep(3)}
-                            >
-                                Next <i className="fas fa-arrow-right ms-2"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            );
-
-            const renderManualForm = () => (
-                <div className="manual-form">
-                    <h6>Manual Listing Creation</h6>
-                    <div className="row mb-3">
-                        <div className="col-12">
-                            <label className="form-label">Marketplace</label>
-                            <select 
-                                className="form-select"
-                                value={activeMarketplace}
-                                onChange={(e) => setActiveMarketplace(e.target.value)}
-                            >
-                                <option value="amazon">Amazon</option>
-                                <option value="flipkart">Flipkart</option>
-                                <option value="meesho">Meesho</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div className="row mb-3">
-                        <div className="col-12">
-                            <label className="form-label">Product Title</label>
-                            <input
-                                type="text"
-                                className="form-control"
-                                value={manualListing.title}
-                                onChange={(e) => setManualListing(prev => ({ ...prev, title: e.target.value }))}
-                                placeholder="Enter product title"
-                                maxLength="200"
-                            />
-                            <small className="text-muted">{manualListing.title.length}/200 characters</small>
-                        </div>
-                    </div>
-                    <div className="row mb-3">
-                        <div className="col-12">
-                            <label className="form-label">Description</label>
-                            <textarea
-                                className="form-control"
-                                rows="4"
-                                value={manualListing.description}
-                                onChange={(e) => setManualListing(prev => ({ ...prev, description: e.target.value }))}
-                                placeholder="Enter product description"
-                            />
-                        </div>
-                    </div>
-                    <div className="row mb-3">
-                        <div className="col-12">
-                            <label className="form-label">Bullet Points</label>
-                            {manualListing.bulletPoints.map((bullet, index) => (
-                                <input
-                                    key={index}
-                                    type="text"
-                                    className="form-control mb-2"
-                                    value={bullet}
-                                    onChange={(e) => updateBulletPoint(index, e.target.value)}
-                                    placeholder={`Bullet point ${index + 1}`}
-                                    maxLength="250"
-                                />
-                            ))}
-                        </div>
-                    </div>
-                    <div className="row mb-3">
-                        <div className="col-md-6">
-                            <label className="form-label">Category</label>
-                            <input
-                                type="text"
-                                className="form-control"
-                                value={manualListing.category}
-                                onChange={(e) => setManualListing(prev => ({ ...prev, category: e.target.value }))}
-                                placeholder="Enter category"
-                            />
-                        </div>
-                        <div className="col-md-6">
-                            <label className="form-label">HSN Code</label>
-                            <input
-                                type="text"
-                                className="form-control"
-                                value={manualListing.hsnCode}
-                                onChange={(e) => setManualListing(prev => ({ ...prev, hsnCode: e.target.value }))}
-                                placeholder="Enter HSN code"
-                            />
-                        </div>
-                    </div>
-                    <div className="row mb-3">
-                        <div className="col-12">
-                            <label className="form-label">Keywords (comma-separated)</label>
-                            <input
-                                type="text"
-                                className="form-control"
-                                value={manualListing.keywords}
-                                onChange={(e) => setManualListing(prev => ({ ...prev, keywords: e.target.value }))}
-                                placeholder="keyword1, keyword2, keyword3"
-                            />
-                        </div>
-                    </div>
-                </div>
-            );
-
-            const renderGeneration = () => (
-                <div className="card">
-                    <div className="card-header">
-                        <h5><i className="fas fa-magic me-2"></i>{mode === 'ai' ? 'Generate Listings' : 'Create Listing'}</h5>
-                    </div>
-                    <div className="card-body">
-                        {mode === 'manual' && renderManualForm()}
-                        
-                        {loading && (
-                            <div className="text-center">
-                                <div className="loading-spinner"></div>
-                                <p>{mode === 'ai' ? 'Generating AI listings...' : 'Processing...'}</p>
-                            </div>
-                        )}
-
-                        {Object.keys(listings).length > 0 && (
-                            <div className="mt-4">
-                                <h6>Generated Listings</h6>
-                                <div className="row">
-                                    {marketplaces.map(marketplace => (
-                                        listings[marketplace] && (
-                                            <div key={marketplace} className="col-12 mb-4">
-                                                <h6 className="text-capitalize">{marketplace} Listings</h6>
-                                                {listings[marketplace].map((listing, index) => (
-                                                    <div key={index} className="version-card p-3">
-                                                        <div className="d-flex justify-content-between align-items-center mb-2">
-                                                            <span className="badge bg-primary">Version {listing.version}</span>
-                                                            <small className="text-muted">{listing.style}</small>
-                                                        </div>
-                                                        <h6>{listing.title}</h6>
-                                                        <p className="small">{listing.description}</p>
-                                                        <div className="small">
-                                                            <strong>Features:</strong>
-                                                            <ul className="mb-0">
-                                                                {listing.bulletPoints.map((bullet, i) => (
-                                                                    <li key={i}>{bullet}</li>
-                                                                ))}
-                                                            </ul>
-                                                        </div>
-                                                        <div className="mt-2">
-                                                            <span className="badge bg-light text-dark me-2">HSN: {listing.hsnCode}</span>
-                                                            <span className="badge bg-light text-dark">Category: {listing.category}</span>
-                                                        </div>
+                            {/* Generated/Manual Listing */}
+                            {mode === 'ai' && generatedListing && (
+                                <div className="space-y-6">
+                                    {/* Amazon Versions */}
+                                    <div className="glass-effect p-6">
+                                        <h3 className="text-xl font-semibold text-white mb-4">🛒 Amazon Listings</h3>
+                                        {generatedListing.amazon?.map((version, index) => (
+                                            <div key={index} className="bg-white p-4 rounded-lg mb-4 space-y-3">
+                                                <div className="flex justify-between items-center">
+                                                    <h4 className="font-bold text-orange-600">Version {version.version}</h4>
+                                                    <span className="text-sm bg-orange-100 text-orange-800 px-2 py-1 rounded">
+                                                        {version.style}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Title:</h5>
+                                                    <p className="text-gray-600 text-sm">{version.title}</p>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Bullet Points:</h5>
+                                                    <ul className="list-disc list-inside text-gray-600 text-sm">
+                                                        {version.bulletPoints?.map((bullet, idx) => (
+                                                            bullet && <li key={idx}>{bullet}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Description:</h5>
+                                                    <p className="text-gray-600 text-sm">{version.description}</p>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                                    <div>
+                                                        <h5 className="font-semibold text-gray-800">Category:</h5>
+                                                        <p className="text-gray-600">{version.category}</p>
                                                     </div>
+                                                    <div>
+                                                        <h5 className="font-semibold text-gray-800">HSN Code:</h5>
+                                                        <p className="text-gray-600">{version.hsnCode}</p>
+                                                        <p className="text-xs text-blue-600 cursor-pointer hover:underline" 
+                                                           onClick={() => checkGstRate(version.hsnCode, `gst-info-amazon-${index}`)}>
+                                                            Click to check GST rate
+                                                        </p>
+                                                        <div id={`gst-info-amazon-${index}`} className="text-xs text-green-600 mt-1"></div>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Keywords:</h5>
+                                                    <p className="text-gray-600 text-sm">
+                                                        {Array.isArray(version.keywords) ? version.keywords.join(', ') : version.keywords}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Flipkart Versions */}
+                                    <div className="glass-effect p-6">
+                                        <h3 className="text-xl font-semibold text-white mb-4">🛍️ Flipkart Listings</h3>
+                                        {generatedListing.flipkart?.map((version, index) => (
+                                            <div key={index} className="bg-white p-4 rounded-lg mb-4 space-y-3">
+                                                <div className="flex justify-between items-center">
+                                                    <h4 className="font-bold text-blue-600">Version {version.version}</h4>
+                                                    <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                                        {version.style}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Title:</h5>
+                                                    <p className="text-gray-600 text-sm">{version.title}</p>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Bullet Points:</h5>
+                                                    <ul className="list-disc list-inside text-gray-600 text-sm">
+                                                        {version.bulletPoints?.map((bullet, idx) => (
+                                                            bullet && <li key={idx}>{bullet}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Description:</h5>
+                                                    <p className="text-gray-600 text-sm">{version.description}</p>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                                    <div>
+                                                        <h5 className="font-semibold text-gray-800">Category:</h5>
+                                                        <p className="text-gray-600">{version.category}</p>
+                                                    </div>
+                                                    <div>
+                                                        <h5 className="font-semibold text-gray-800">HSN Code:</h5>
+                                                        <p className="text-gray-600">{version.hsnCode}</p>
+                                                         <p className="text-xs text-blue-600 cursor-pointer hover:underline" 
+                                                           onClick={() => checkGstRate(version.hsnCode, `gst-info-flipkart-${index}`)}>
+                                                            Click to check GST rate
+                                                        </p>
+                                                        <div id={`gst-info-flipkart-${index}`} className="text-xs text-green-600 mt-1"></div>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Keywords:</h5>
+                                                    <p className="text-gray-600 text-sm">
+                                                        {Array.isArray(version.keywords) ? version.keywords.join(', ') : version.keywords}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Meesho Versions */}
+                                    <div className="glass-effect p-6">
+                                        <h3 className="text-xl font-semibold text-white mb-4">🏪 Meesho Listings</h3>
+                                        {generatedListing.meesho?.map((version, index) => (
+                                            <div key={index} className="bg-white p-4 rounded-lg mb-4 space-y-3">
+                                                <div className="flex justify-between items-center">
+                                                    <h4 className="font-bold text-pink-600">Version {version.version}</h4>
+                                                    <span className="text-sm bg-pink-100 text-pink-800 px-2 py-1 rounded">
+                                                        {version.style}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Title:</h5>
+                                                    <p className="text-gray-600 text-sm">{version.title}</p>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Bullet Points:</h5>
+                                                    <ul className="list-disc list-inside text-gray-600 text-sm">
+                                                        {version.bulletPoints?.map((bullet, idx) => (
+                                                            bullet && <li key={idx}>{bullet}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Description:</h5>
+                                                    <p className="text-gray-600 text-sm">{version.description}</p>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                                    <div>
+                                                        <h5 className="font-semibold text-gray-800">Category:</h5>
+                                                        <p className="text-gray-600">{version.category}</p>
+                                                    </div>
+                                                    <div>
+                                                        <h5 className="font-semibold text-gray-800">HSN Code:</h5>
+                                                        <p className="text-gray-600">{version.hsnCode}</p>
+                                                        <p className="text-xs text-blue-600 cursor-pointer hover:underline" 
+                                                           onClick={() => checkGstRate(version.hsnCode, `gst-info-meesho-${index}`)}>
+                                                            Click to check GST rate
+                                                        </p>
+                                                        <div id={`gst-info-meesho-${index}`} className="text-xs text-green-600 mt-1"></div>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Keywords:</h5>
+                                                    <p className="text-gray-600 text-sm">
+                                                        {Array.isArray(version.keywords) ? version.keywords.join(', ') : version.keywords}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Manual Listing */}
+                            {mode === 'manual' && manualListing.title && (
+                                <div className="glass-effect p-6">
+                                    <h3 className="text-xl font-semibold text-white mb-4">📋 Manual Product Listing</h3>
+                                    <div className="bg-white p-4 rounded-lg space-y-4">
+                                        <div>
+                                            <h4 className="font-semibold text-gray-800">Title:</h4>
+                                            <p className="text-gray-600">{manualListing.title}</p>
+                                        </div>
+
+                                        <div>
+                                            <h4 className="font-semibold text-gray-800">Bullet Points:</h4>
+                                            <ul className="list-disc list-inside text-gray-600">
+                                                {manualListing.bulletPoints?.map((bullet, index) => (
+                                                    bullet && <li key={index}>{bullet}</li>
                                                 ))}
+                                            </ul>
+                                        </div>
+
+                                        <div>
+                                            <h4 className="font-semibold text-gray-800">Description:</h4>
+                                            <p className="text-gray-600">{manualListing.description}</p>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <h4 className="font-semibold text-gray-800">Category:</h4>
+                                                <p className="text-gray-600">{manualListing.category}</p>
                                             </div>
-                                        )
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="mt-4 d-flex justify-content-between">
-                            <button 
-                                className="btn btn-outline-secondary"
-                                onClick={() => setCurrentStep(2)}
-                            >
-                                <i className="fas fa-arrow-left me-2"></i>Back
-                            </button>
-                            <button 
-                                className="btn btn-primary"
-                                onClick={generateListings}
-                                disabled={loading || (mode === 'manual' && !manualListing.title)}
-                            >
-                                {mode === 'ai' ? 'Generate with AI' : 'Create Listing'} <i className="fas fa-magic ms-2"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            );
-
-            const renderPricing = () => (
-                <div className="card">
-                    <div className="card-header">
-                        <h5><i className="fas fa-dollar-sign me-2"></i>Pricing Calculator</h5>
-                    </div>
-                    <div className="card-body">
-                        {Object.keys(pricing).length > 0 ? (
-                            <div>
-                                {marketplaces.map(marketplace => (
-                                    pricing[marketplace] && (
-                                        <div key={marketplace} className="price-breakdown mb-4">
-                                            <h6 className="text-capitalize mb-3">{marketplace} Pricing</h6>
-                                            <div className="row">
-                                                <div className="col-md-6">
-                                                    <table className="table table-sm">
-                                                        <tbody>
-                                                            <tr>
-                                                                <td>Cost Price:</td>
-                                                                <td>₹{pricing[marketplace].costPrice}</td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td>GST ({pricing[marketplace].gstRate}):</td>
-                                                                <td>₹{pricing[marketplace].gst}</td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td>Target Profit:</td>
-                                                                <td>₹{pricing[marketplace].targetProfit}</td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td>Shipping Cost:</td>
-                                                                <td>₹{pricing[marketplace].shippingCost}</td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td>Platform Commission ({pricing[marketplace].platformCommissionRate}):</td>
-                                                                <td>₹{pricing[marketplace].platformCommission}</td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                                <div className="col-md-6">
-                                                    <div className="text-end">
-                                                        <div className="mb-2">
-                                                            <strong>MRP: ₹{pricing[marketplace].mrp}</strong>
-                                                        </div>
-                                                        <div className="mb-2">
-                                                            <strong className="text-success">Selling Price: ₹{pricing[marketplace].sellingPrice}</strong>
-                                                        </div>
-                                                        <small className="text-muted">
-                                                            HSN: {pricing[marketplace].hsnCode}<br/>
-                                                            {pricing[marketplace].gstDescription}
-                                                        </small>
-                                                    </div>
-                                                </div>
+                                            <div>
+                                                <h4 className="font-semibold text-gray-800">HSN Code:</h4>
+                                                <p className="text-gray-600">{manualListing.hsnCode}</p>
                                             </div>
                                         </div>
-                                    )
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center">
-                                <p>Configure pricing for your products</p>
-                            </div>
-                        )}
 
-                        <div className="mt-4 d-flex justify-content-between">
-                            <button 
-                                className="btn btn-outline-secondary"
-                                onClick={() => setCurrentStep(3)}
-                            >
-                                <i className="fas fa-arrow-left me-2"></i>Back
-                            </button>
-                            <button 
-                                className="btn btn-primary"
-                                onClick={calculatePricing}
-                                disabled={loading || !productInfo.costPrice || !productInfo.hsnCode}
-                            >
-                                Calculate Pricing <i className="fas fa-calculator ms-2"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            );
-
-            const renderExport = () => (
-                <div className="card">
-                    <div className="card-header">
-                        <h5><i className="fas fa-download me-2"></i>Export Listings</h5>
-                    </div>
-                    <div className="card-body">
-                        <div className="row">
-                            {marketplaces.map(marketplace => (
-                                <div key={marketplace} className="col-md-4 mb-3">
-                                    <div className="card h-100">
-                                        <div className="card-body text-center">
-                                            <i className={`fas fa-${marketplace === 'amazon' ? 'shopping-cart' : marketplace === 'flipkart' ? 'store' : 'users'} fa-2x mb-3 text-primary`}></i>
-                                            <h6 className="text-capitalize">{marketplace}</h6>
-                                            <p className="small text-muted">
-                                                Export {marketplace === 'flipkart' ? 'CSV' : 'Excel'} format
+                                        <div>
+                                            <h4 className="font-semibold text-gray-800">Keywords:</h4>
+                                            <p className="text-gray-600">
+                                                {Array.isArray(manualListing.keywords) ? manualListing.keywords.join(', ') : ''}
                                             </p>
-                                            <button 
-                                                className="btn btn-outline-primary export-button"
-                                                onClick={() => exportData(marketplace)}
-                                                disabled={loading || (mode === 'ai' && !listings[marketplace]) || (mode === 'manual' && activeMarketplace !== marketplace)}
-                                            >
-                                                <i className="fas fa-download me-2"></i>
-                                                Export
-                                            </button>
                                         </div>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
+                            )}
 
-                        <div className="mt-4 d-flex justify-content-between">
-                            <button 
-                                className="btn btn-outline-secondary"
-                                onClick={() => setCurrentStep(4)}
-                            >
-                                <i className="fas fa-arrow-left me-2"></i>Back
-                            </button>
-                            <button 
-                                className="btn btn-success"
-                                onClick={() => {
-                                    setCurrentStep(1);
-                                    setListings({});
-                                    setPricing({});
-                                    setImage(null);
-                                    setImagePreview(null);
-                                    setProductInfo({
-                                        name: '',
-                                        brand: '',
-                                        dimensions: '',
-                                        costPrice: '',
-                                        weight: '',
-                                        length: '',
-                                        width: '',
-                                        height: '',
-                                        hsnCode: ''
-                                    });
-                                    setManualListing({
-                                        title: '',
-                                        description: '',
-                                        bulletPoints: ['', '', '', '', ''],
-                                        keywords: '',
-                                        category: '',
-                                        hsnCode: ''
-                                    });
-                                }}
-                            >
-                                <i className="fas fa-plus me-2"></i>New Product
-                            </button>
+                            {/* Export Options */}
+                            {(generatedListing || (mode === 'manual' && manualListing.title)) && (
+                                <div className="glass-effect p-6">
+                                    <h3 className="text-xl font-semibold text-white mb-4">📤 Export Options</h3>
+                                    <div className="space-y-3">
+                                        <button
+                                            onClick={() => exportListing('amazon')}
+                                            className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all font-semibold"
+                                        >
+                                            📊 Export for Amazon (Excel)
+                                        </button>
+                                        <button
+                                            onClick={() => exportListing('flipkart')}
+                                            className="w-full px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all font-semibold"
+                                        >
+                                            📋 Export for Flipkart (CSV)
+                                        </button>
+                                        <button
+                                            onClick={() => exportListing('meesho')}
+                                            className="w-full px-4 py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-all font-semibold"
+                                        >
+                                            📈 Export for Meesho (Excel)
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
-                </div>
-            );
-
-            return (
-                <div className="container my-4">
-                    <div className="text-center mb-5">
-                        <h1 className="display-4">
-                            <i className="fas fa-store text-primary me-3"></i>
-                            E-commerce Listing Generator
-                        </h1>
-                        <p className="lead text-muted">Create professional product listings for Amazon, Flipkart, and Meesho</p>
-                    </div>
-
-                    {renderStepIndicator()}
-
-                    {loading && (
-                        <div className="text-center mb-4">
-                            <div className="loading-spinner"></div>
-                        </div>
-                    )}
-
-                    {currentStep === 1 && renderModeSelection()}
-                    {currentStep === 2 && renderProductInfo()}
-                    {currentStep === 3 && renderGeneration()}
-                    {currentStep === 4 && renderPricing()}
-                    {currentStep === 5 && renderExport()}
                 </div>
             );
         }
