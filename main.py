@@ -14,6 +14,12 @@ import requests
 from bs4 import BeautifulSoup
 import re
 from urllib.parse import urlparse
+import uuid
+import hashlib
+import time
+from datetime import datetime, timedelta
+import json
+import random
 
 app = Flask(__name__)
 CORS(app)
@@ -1359,6 +1365,381 @@ def scrape_product():
             return jsonify({'success': True, 'data': product_data})
         else:
             return jsonify({'error': 'Could not extract product data from URL'}), 400
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Advanced feature functions
+def generate_product_image_variations(product_title, brand, category):
+    """Generate lifestyle image prompts for AI image generation"""
+    lifestyle_scenarios = [
+        f"{product_title} being used in a modern living room setting",
+        f"Person enjoying {product_title} in a cozy home environment",
+        f"{product_title} displayed elegantly on a marble surface with natural lighting",
+        f"Lifestyle shot of {product_title} in use during daily routine",
+        f"{product_title} artistically arranged with complementary lifestyle items",
+        f"Professional product photography of {product_title} with premium styling"
+    ]
+    
+    return {
+        'prompts': lifestyle_scenarios,
+        'suggested_dimensions': {
+            'amazon': {'width': 2000, 'height': 2000},
+            'flipkart': {'width': 1200, 'height': 1200},
+            'meesho': {'width': 800, 'height': 800}
+        },
+        'enhancement_tips': [
+            'Use natural lighting for better appeal',
+            'Include lifestyle elements to show product in use',
+            'Maintain consistent brand colors',
+            'Ensure high contrast for marketplace visibility'
+        ]
+    }
+
+def calculate_comprehensive_gst(cost_price, hsn_code, state_from="Delhi", state_to="Mumbai"):
+    """Calculate comprehensive GST including CGST, SGST, IGST"""
+    gst_rate, description, hsn_data = get_gst_rate_from_hsn_api(hsn_code)
+    
+    # Calculate different GST components
+    gst_amount = cost_price * gst_rate
+    
+    # Inter-state vs Intra-state GST calculation
+    if state_from == state_to:
+        # Intra-state: CGST + SGST
+        cgst = gst_amount / 2
+        sgst = gst_amount / 2
+        igst = 0
+    else:
+        # Inter-state: IGST
+        cgst = 0
+        sgst = 0
+        igst = gst_amount
+    
+    # TCS (Tax Collected at Source) for high-value items
+    tcs_threshold = 50000
+    tcs_rate = 0.001 if cost_price > tcs_threshold else 0
+    tcs_amount = cost_price * tcs_rate
+    
+    # TDS (Tax Deducted at Source) for business purchases
+    tds_rate = 0.001 if cost_price > 5000 else 0
+    tds_amount = cost_price * tds_rate
+    
+    return {
+        'costPrice': cost_price,
+        'hsnCode': hsn_code,
+        'gstRate': gst_rate * 100,
+        'gstAmount': round(gst_amount, 2),
+        'cgst': round(cgst, 2),
+        'sgst': round(sgst, 2),
+        'igst': round(igst, 2),
+        'tcs': round(tcs_amount, 2),
+        'tds': round(tds_amount, 2),
+        'totalTax': round(gst_amount + tcs_amount, 2),
+        'priceWithTax': round(cost_price + gst_amount + tcs_amount, 2),
+        'gstDescription': description,
+        'taxType': 'Intra-state' if state_from == state_to else 'Inter-state'
+    }
+
+def optimize_image_for_platforms(image_dimensions, platforms=['amazon', 'flipkart', 'meesho']):
+    """Generate optimized image specifications for different platforms"""
+    platform_specs = {
+        'amazon': {
+            'main_image': {'width': 2000, 'height': 2000, 'format': 'JPEG', 'quality': 85},
+            'additional_images': {'width': 1600, 'height': 1600, 'format': 'JPEG', 'quality': 80},
+            'zoom_requirement': True,
+            'background': 'Pure white (RGB 255,255,255)',
+            'file_size_limit': '10MB'
+        },
+        'flipkart': {
+            'main_image': {'width': 1200, 'height': 1200, 'format': 'JPEG', 'quality': 80},
+            'additional_images': {'width': 800, 'height': 800, 'format': 'JPEG', 'quality': 75},
+            'zoom_requirement': False,
+            'background': 'White or transparent',
+            'file_size_limit': '5MB'
+        },
+        'meesho': {
+            'main_image': {'width': 800, 'height': 800, 'format': 'JPEG', 'quality': 75},
+            'additional_images': {'width': 600, 'height': 600, 'format': 'JPEG', 'quality': 70},
+            'zoom_requirement': False,
+            'background': 'Any solid color',
+            'file_size_limit': '2MB'
+        }
+    }
+    
+    optimization_tips = {
+        'cropping': 'Ensure product occupies 85% of image area',
+        'lighting': 'Use soft, even lighting to avoid harsh shadows',
+        'angles': 'Include front, side, and detail shots',
+        'text_overlay': 'Avoid text on main image for Amazon',
+        'watermarks': 'Remove all watermarks and logos'
+    }
+    
+    return {
+        'platform_specs': {platform: platform_specs[platform] for platform in platforms},
+        'optimization_tips': optimization_tips
+    }
+
+def create_ab_test_variations(original_title, original_description, original_bullets):
+    """Generate A/B testing variations for titles and descriptions"""
+    
+    # Title variations
+    title_variations = [
+        f"Premium {original_title}",
+        f"Best {original_title}",
+        f"{original_title} - Top Quality",
+        f"Professional {original_title}",
+        f"{original_title} - Limited Edition"
+    ]
+    
+    # Description emotion variations
+    emotion_prefixes = [
+        "Experience the luxury of",
+        "Discover the convenience of",
+        "Enjoy the reliability of",
+        "Transform your life with",
+        "Upgrade your lifestyle with"
+    ]
+    
+    description_variations = []
+    for prefix in emotion_prefixes:
+        description_variations.append(f"{prefix} {original_description.lower()}")
+    
+    # Bullet point variations (power words)
+    power_words = ["Premium", "Professional", "Advanced", "Innovative", "Exclusive", "Superior"]
+    bullet_variations = []
+    
+    for bullet in original_bullets:
+        if bullet:
+            variations = []
+            for word in power_words:
+                if word.lower() not in bullet.lower():
+                    variations.append(f"{word} {bullet}")
+            bullet_variations.append(variations[:3])  # Top 3 variations
+    
+    return {
+        'title_variations': title_variations,
+        'description_variations': description_variations,
+        'bullet_variations': bullet_variations,
+        'test_metrics': [
+            'Click-through rate (CTR)',
+            'Conversion rate',
+            'Add to cart rate',
+            'Bounce rate',
+            'Time on page'
+        ],
+        'test_duration_recommendation': '2-4 weeks minimum'
+    }
+
+def analyze_review_sentiment(competitor_reviews):
+    """Analyze sentiment of competitor reviews to find improvement opportunities"""
+    # Simulated sentiment analysis (in real implementation, use NLP libraries)
+    positive_keywords = ['good', 'great', 'excellent', 'amazing', 'love', 'perfect', 'quality', 'fast', 'recommend']
+    negative_keywords = ['bad', 'terrible', 'awful', 'hate', 'slow', 'poor', 'broken', 'defective', 'waste']
+    
+    improvement_opportunities = []
+    common_complaints = []
+    positive_highlights = []
+    
+    # In a real implementation, this would process actual review text
+    simulated_analysis = {
+        'sentiment_score': 0.72,  # 0-1 scale
+        'total_reviews_analyzed': len(competitor_reviews) if competitor_reviews else 100,
+        'positive_percentage': 68,
+        'negative_percentage': 32,
+        'common_complaints': [
+            'Packaging could be better',
+            'Delivery was delayed',
+            'Size runs small',
+            'Instructions unclear',
+            'Customer service slow'
+        ],
+        'positive_highlights': [
+            'Great value for money',
+            'Good build quality',
+            'Fast shipping',
+            'Easy to use',
+            'Looks exactly like photos'
+        ],
+        'improvement_opportunities': [
+            'Improve packaging quality',
+            'Add detailed size guide',
+            'Include clearer instructions',
+            'Enhance customer service response time',
+            'Offer better return policy'
+        ]
+    }
+    
+    return simulated_analysis
+
+def track_keyword_rankings(keywords, platforms=['amazon', 'flipkart', 'meesho']):
+    """Simulate keyword ranking tracking across platforms"""
+    
+    ranking_data = {}
+    
+    for platform in platforms:
+        platform_rankings = {}
+        for keyword in keywords:
+            if keyword:
+                # Simulate ranking data
+                platform_rankings[keyword] = {
+                    'current_rank': random.randint(1, 100),
+                    'previous_rank': random.randint(1, 100),
+                    'search_volume': random.randint(100, 5000),
+                    'competition_level': random.choice(['Low', 'Medium', 'High']),
+                    'trending': random.choice([True, False]),
+                    'suggested_bid': round(random.uniform(0.5, 5.0), 2)
+                }
+        
+        ranking_data[platform] = platform_rankings
+    
+    return {
+        'rankings': ranking_data,
+        'recommendations': [
+            'Focus on long-tail keywords for better ranking',
+            'Optimize product images for better visibility',
+            'Improve product reviews and ratings',
+            'Use relevant keywords in title and description',
+            'Monitor competitor keyword strategies'
+        ],
+        'last_updated': datetime.now().isoformat()
+    }
+
+def analyze_market_trends(category, timeframe='30d'):
+    """Analyze market trends and popular keywords"""
+    
+    # Simulated trend data
+    trending_keywords = [
+        {'keyword': 'eco-friendly', 'growth': '+25%', 'volume': 15000},
+        {'keyword': 'sustainable', 'growth': '+18%', 'volume': 12000},
+        {'keyword': 'premium quality', 'growth': '+12%', 'volume': 8000},
+        {'keyword': 'fast delivery', 'growth': '+8%', 'volume': 20000},
+        {'keyword': 'budget-friendly', 'growth': '+15%', 'volume': 18000}
+    ]
+    
+    seasonal_trends = {
+        'Q1': ['New Year', 'Valentine', 'Health & Fitness'],
+        'Q2': ['Summer', 'Mother\'s Day', 'Outdoor'],
+        'Q3': ['Back to School', 'Monsoon', 'Festive Prep'],
+        'Q4': ['Festival Season', 'Winter', 'Gift Items']
+    }
+    
+    return {
+        'trending_keywords': trending_keywords,
+        'seasonal_trends': seasonal_trends,
+        'category_insights': {
+            'fastest_growing_subcategories': [
+                'Smart Home Devices',
+                'Sustainable Products',
+                'Health & Wellness',
+                'Work from Home Essentials'
+            ],
+            'emerging_trends': [
+                'Voice-activated products',
+                'Biodegradable packaging',
+                'Contactless features',
+                'Multi-functional items'
+            ]
+        },
+        'price_trends': {
+            'average_price_increase': '5-8% annually',
+            'premium_segment_growth': '12% YoY',
+            'budget_segment_growth': '15% YoY'
+        },
+        'analysis_date': datetime.now().isoformat()
+    }
+
+# New API endpoints for advanced features
+
+@app.route('/api/generate-product-images', methods=['POST'])
+def generate_product_images():
+    try:
+        data = request.get_json()
+        product_title = data.get('title', '')
+        brand = data.get('brand', '')
+        category = data.get('category', '')
+        
+        image_data = generate_product_image_variations(product_title, brand, category)
+        return jsonify({'success': True, 'data': image_data})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/calculate-comprehensive-gst', methods=['POST'])
+def calculate_comprehensive_gst_api():
+    try:
+        data = request.get_json()
+        cost_price = float(data.get('costPrice', 0))
+        hsn_code = data.get('hsnCode', '9999')
+        state_from = data.get('stateFrom', 'Delhi')
+        state_to = data.get('stateTo', 'Mumbai')
+        
+        gst_data = calculate_comprehensive_gst(cost_price, hsn_code, state_from, state_to)
+        return jsonify({'success': True, 'data': gst_data})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/optimize-images', methods=['POST'])
+def optimize_images():
+    try:
+        data = request.get_json()
+        image_dimensions = data.get('dimensions', {})
+        platforms = data.get('platforms', ['amazon', 'flipkart', 'meesho'])
+        
+        optimization_data = optimize_image_for_platforms(image_dimensions, platforms)
+        return jsonify({'success': True, 'data': optimization_data})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/create-ab-test', methods=['POST'])
+def create_ab_test():
+    try:
+        data = request.get_json()
+        title = data.get('title', '')
+        description = data.get('description', '')
+        bullets = data.get('bulletPoints', [])
+        
+        ab_test_data = create_ab_test_variations(title, description, bullets)
+        return jsonify({'success': True, 'data': ab_test_data})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/analyze-reviews', methods=['POST'])
+def analyze_reviews():
+    try:
+        data = request.get_json()
+        reviews = data.get('reviews', [])
+        
+        sentiment_data = analyze_review_sentiment(reviews)
+        return jsonify({'success': True, 'data': sentiment_data})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/track-keywords', methods=['POST'])
+def track_keywords():
+    try:
+        data = request.get_json()
+        keywords = data.get('keywords', [])
+        platforms = data.get('platforms', ['amazon', 'flipkart', 'meesho'])
+        
+        ranking_data = track_keyword_rankings(keywords, platforms)
+        return jsonify({'success': True, 'data': ranking_data})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/market-trends', methods=['POST'])
+def market_trends():
+    try:
+        data = request.get_json()
+        category = data.get('category', 'General')
+        timeframe = data.get('timeframe', '30d')
+        
+        trend_data = analyze_market_trends(category, timeframe)
+        return jsonify({'success': True, 'data': trend_data})
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500

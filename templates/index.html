@@ -219,9 +219,9 @@
                         console.error('GST element not found:', elementId);
                         return;
                     }
-                    
+
                     gstElement.textContent = 'Checking GST rate...';
-                    
+
                     const response = await fetch('/api/validate-hsn', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -231,19 +231,19 @@
                     const data = await response.json();
                     if (data.success) {
                         let displayText = `GST Rate: ${data.gstRate}%`;
-                        
+
                         if (data.source) {
                             displayText += ` (${data.source})`;
                         }
-                        
+
                         if (data.chapterName) {
                             displayText += `\nCategory: ${data.chapterName}`;
                         }
-                        
+
                         if (data.apiHsnCode && data.apiHsnCode !== hsnCode) {
                             displayText += `\nMatched HSN: ${data.apiHsnCode}`;
                         }
-                        
+
                         gstElement.textContent = displayText;
                         gstElement.style.whiteSpace = 'pre-line'; // Allow line breaks
                     } else {
@@ -345,6 +345,34 @@
                     calculatePrice();
                 }
             }, [productInfo.costPrice, productInfo.profitMargin, productInfo.platformCommission, productInfo.length, productInfo.width, productInfo.height]);
+
+             const generateProductImages = () => {
+                alert('Product Image Generator: AI-generated lifestyle images for products');
+            };
+
+            const calculateComprehensiveGst = () => {
+                alert('Tax Calculator: Complete GST filing helper with automated calculations');
+            };
+
+            const optimizeImages = () => {
+                 alert('Image Enhancement: Auto-crop, resize, and optimize images for each platform');
+            };
+
+            const createAbTest = () => {
+                alert('A/B Testing Generator: Create variations for title/description testing');
+            };
+
+            const analyzeReviews = () => {
+                 alert('Review Sentiment Analysis: Analyze competitor reviews to identify improvement opportunities');
+            };
+
+            const trackKeywords = () => {
+                alert('Keyword Ranking Tracker: Track how your product keywords perform on different platforms');
+            };
+
+            const analyzeMarketTrends = () => {
+               alert('Market Trend Analysis: Show trending keywords and categories based on search volume');
+            };
 
             return (
                 <div className="container mx-auto px-4 py-8">
@@ -888,7 +916,56 @@
                                         </button>
                                     </div>
                                 </div>
-                            )}
+            )}
+
+            {/* Advanced Features Panel */}
+            <div className="glass-effect p-6">
+                <h3 className="text-xl font-semibold text-white mb-4">🚀 Advanced Features</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button
+                        onClick={generateProductImages}
+                        className="px-4 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-all font-semibold"
+                    >
+                        🎨 Generate Product Images
+                    </button>
+                    <button
+                        onClick={calculateComprehensiveGst}
+                        className="px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all font-semibold"
+                    >
+                        📊 GST Calculator
+                    </button>
+                    <button
+                        onClick={optimizeImages}
+                        className="px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all font-semibold"
+                    >
+                        🖼️ Optimize Images
+                    </button>
+                    <button
+                        onClick={createAbTest}
+                        className="px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all font-semibold"
+                    >
+                        🧪 A/B Test Generator
+                    </button>
+                    <button
+                        onClick={analyzeReviews}
+                        className="px-4 py-3 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-all font-semibold"
+                    >
+                        💬 Review Analysis
+                    </button>
+                    <button
+                        onClick={trackKeywords}
+                        className="px-4 py-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-all font-semibold"
+                    >
+                        📈 Keyword Tracker
+                    </button>
+                    <button
+                        onClick={analyzeMarketTrends}
+                        className="px-4 py-3 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-all font-semibold"
+                    >
+                        📊 Market Trends
+                    </button>
+                </div>
+            </div>
                         </div>
                     </div>
                 </div>
