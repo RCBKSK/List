@@ -21,6 +21,106 @@ CORS(app)
 # Configure Gemini AI (will be set by user input)
 genai_api_key = None
 
+# HSN Code to GST Rate mapping (sample data - can be expanded)
+HSN_GST_MAPPING = {
+    # Food items (0% - 5%)
+    "0101": 0.0,   # Live horses, asses, mules and hinnies
+    "0102": 0.0,   # Live bovine animals
+    "0701": 0.0,   # Potatoes, fresh or chilled
+    "0702": 0.0,   # Tomatoes, fresh or chilled
+    "1001": 0.0,   # Wheat and meslin
+    "1006": 0.0,   # Rice
+    "1701": 0.05,  # Cane or beet sugar
+    
+    # Textiles (5% - 12%)
+    "5201": 0.05,  # Cotton, not carded or combed
+    "5208": 0.05,  # Woven fabrics of cotton
+    "6101": 0.12,  # Men's or boys' overcoats
+    "6201": 0.12,  # Women's or girls' overcoats
+    "6301": 0.05,  # Blankets and travelling rugs
+    "6302": 0.05,  # Bed linen, table linen
+    
+    # Electronics (18% - 28%)
+    "8471": 0.18,  # Automatic data processing machines
+    "8517": 0.18,  # Telephone sets, mobile phones
+    "8528": 0.18,  # Monitors and projectors
+    "8544": 0.18,  # Insulated wire, cable
+    "9013": 0.18,  # Liquid crystal devices
+    
+    # Automobiles (28%)
+    "8703": 0.28,  # Motor cars and other motor vehicles
+    "8704": 0.28,  # Motor vehicles for transport of goods
+    "8711": 0.28,  # Motorcycles
+    
+    # Chemicals (5% - 18%)
+    "2501": 0.05,  # Salt
+    "2804": 0.05,  # Hydrogen, rare gases
+    "3004": 0.12,  # Medicaments
+    "3303": 0.18,  # Perfumes and toilet waters
+    "3401": 0.18,  # Soap
+    
+    # Books and stationery (0% - 12%)
+    "4901": 0.0,   # Printed books, brochures
+    "4902": 0.0,   # Newspapers, journals
+    "4910": 0.05,  # Calendars of any kind
+    "4911": 0.12,  # Other printed matter
+    
+    # Common HSN codes for various products
+    "3926": 0.18,  # Other articles of plastics
+    "4202": 0.18,  # Trunks, suit-cases, handbags
+    "6403": 0.18,  # Footwear with outer soles of rubber
+    "7013": 0.18,  # Glassware of a kind used for table
+    "7323": 0.18,  # Table, kitchen or other household articles
+    "8302": 0.18,  # Base metal mountings, fittings
+    "8443": 0.18,  # Printing machinery
+    "9403": 0.12,  # Other furniture and parts thereof
+    "9404": 0.12,  # Mattress supports; articles of bedding
+    "9405": 0.12,  # Lamps and lighting fittings
+    "9503": 0.12,  # Tricycles, scooters, pedal cars (toys)
+    "9504": 0.28,  # Video game consoles and machines
+    "9505": 0.12,  # Festive, carnival or other entertainment articles
+    
+    # Default/Unknown HSN codes
+    "9999": 0.18,  # Default rate for unknown items
+}
+
+def get_gst_rate_from_hsn(hsn_code):
+    """
+    Get GST rate based on HSN code
+    Returns tuple: (gst_rate, description)
+    """
+    if not hsn_code:
+        return 0.18, "Default GST rate (18%)"
+    
+    # Clean HSN code - remove spaces and convert to string
+    hsn_clean = str(hsn_code).replace(" ", "").strip()
+    
+    # Try exact match first
+    if hsn_clean in HSN_GST_MAPPING:
+        rate = HSN_GST_MAPPING[hsn_clean]
+        return rate, f"HSN {hsn_clean}: {rate * 100}% GST"
+    
+    # Try partial match for 4-digit HSN codes (match first 4 digits)
+    if len(hsn_clean) >= 4:
+        hsn_4digit = hsn_clean[:4]
+        if hsn_4digit in HSN_GST_MAPPING:
+            rate = HSN_GST_MAPPING[hsn_4digit]
+            return rate, f"HSN {hsn_4digit}: {rate * 100}% GST (matched from {hsn_clean})"
+    
+    # Try partial match for 2-digit HSN codes (match first 2 digits)
+    if len(hsn_clean) >= 2:
+        hsn_2digit = hsn_clean[:2]
+        # Find similar HSN codes with same first 2 digits
+        similar_hsns = [hsn for hsn in HSN_GST_MAPPING.keys() if hsn.startswith(hsn_2digit)]
+        if similar_hsns:
+            # Use the most common rate for this category
+            rates = [HSN_GST_MAPPING[hsn] for hsn in similar_hsns]
+            common_rate = max(set(rates), key=rates.count)  # Most frequent rate
+            return common_rate, f"Category {hsn_2digit}: {common_rate * 100}% GST (estimated from {hsn_clean})"
+    
+    # Default to 18% if no match found
+    return 0.18, f"HSN {hsn_clean}: 18% GST (default rate - unknown HSN)"
+
 def configure_gemini(api_key):
     global genai_api_key
     genai_api_key = api_key
@@ -577,6 +677,15 @@ def generate_listing():
         - Dimensions: {dimensions}
         - Cost Price: ₹{cost_price}
         
+        For HSN codes, please provide accurate 4-digit HSN codes based on the actual product category. Common examples:
+        - Electronics/Mobile: 8517 (18% GST)
+        - Clothing/Textiles: 6101-6302 (5-12% GST)
+        - Books: 4901 (0% GST)
+        - Furniture: 9403 (12% GST)
+        - Footwear: 6403 (18% GST)
+        - Plastic items: 3926 (18% GST)
+        - Kitchen items: 7323 (18% GST)
+        
         Please provide a JSON response with the following structure:
         {{
             "amazon": [
@@ -587,7 +696,7 @@ def generate_listing():
                     "bulletPoints": ["3-5 bullet points under 250 chars each"],
                     "description": "50-75 words description",
                     "category": "Suggested category",
-                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "hsnCode": "Accurate 4-digit HSN code for this product category",
                     "keywords": ["comma-separated SEO keywords"]
                 }},
                 {{
@@ -827,8 +936,11 @@ def calculate_price():
         
         cost_price = float(data.get('costPrice', 0))
         profit_margin = float(data.get('profitMargin', 42.5)) / 100
-        gst_rate = 0.05  # Fixed 5% GST
+        hsn_code = data.get('hsnCode', '9999')  # Get HSN code from request
         marketplace = data.get('marketplace', 'amazon')
+        
+        # Get GST rate based on HSN code
+        gst_rate, gst_description = get_gst_rate_from_hsn(hsn_code)
         
         # Get weight and dimensions
         weight = float(data.get('weight', 0))
@@ -867,6 +979,9 @@ def calculate_price():
             price_breakdowns[platform] = {
                 'costPrice': cost_price,
                 'gst': round(cost_price * gst_rate, 2),
+                'gstRate': f"{gst_rate * 100}%",
+                'gstDescription': gst_description,
+                'hsnCode': hsn_code,
                 'targetProfit': round(target_profit, 2),
                 'shippingCost': round(avg_shipping, 2),
                 'shippingDetails': shipping_info,
@@ -1034,6 +1149,29 @@ def export_listing(format):
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'Export failed: {str(e)}'}), 500
+
+@app.route('/api/validate-hsn', methods=['POST'])
+def validate_hsn():
+    try:
+        data = request.get_json()
+        hsn_code = data.get('hsnCode', '')
+        
+        if not hsn_code:
+            return jsonify({'error': 'HSN code is required'}), 400
+        
+        gst_rate, description = get_gst_rate_from_hsn(hsn_code)
+        
+        return jsonify({
+            'success': True,
+            'hsnCode': hsn_code,
+            'gstRate': gst_rate * 100,
+            'gstRateDecimal': gst_rate,
+            'description': description,
+            'isKnownHsn': hsn_code in HSN_GST_MAPPING
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/configure-gemini', methods=['POST'])
 def configure_gemini_api():
