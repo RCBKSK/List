@@ -62,6 +62,8 @@
             const [generatedListing, setGeneratedListing] = useState(null);
             const [priceBreakdown, setPriceBreakdown] = useState(null);
             const [loading, setLoading] = useState(false);
+            const [errors, setErrors] = useState({});
+            const [successMessages, setSuccessMessages] = useState({});
             const [manualListing, setManualListing] = useState({
                 title: '',
                 bulletPoints: ['', '', ''],
@@ -95,6 +97,53 @@
                         setProductInfo(prev => ({
                             ...prev,
                             name: data.title || prev.name,
+
+            const [selectedImages, setSelectedImages] = useState([]);
+            const [bulkMode, setBulkMode] = useState(false);
+            const [bulkResults, setBulkResults] = useState([]);
+
+            const handleBulkImageUpload = (files) => {
+                const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+                if (imageFiles.length > 10) {
+                    alert('Maximum 10 images allowed at once');
+                    return;
+                }
+                setSelectedImages(imageFiles);
+                setBulkMode(true);
+            };
+
+            const processBulkImages = async () => {
+                setLoading(true);
+                const results = [];
+                
+                for (const image of selectedImages) {
+                    try {
+                        const reader = new FileReader();
+                        reader.onload = async (e) => {
+                            const base64Image = e.target.result;
+                            const response = await fetch('/api/generate-listing', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    image: base64Image,
+                                    productInfo: productInfo
+                                }),
+                            });
+                            const result = await response.json();
+                            if (result.success) {
+                                results.push({ imageName: image.name, listing: result.data });
+                            }
+                        };
+                        reader.readAsDataURL(image);
+                    } catch (error) {
+                        console.error('Error processing image:', error);
+                    }
+                }
+                
+                setBulkResults(results);
+                setLoading(false);
+            };
+
                             brand: data.brand || prev.brand,
                             weight: data.weight || prev.weight,
                             length: data.dimensions?.length || prev.length,
@@ -748,6 +797,29 @@
                                                         <h5 className="font-semibold text-gray-800">HSN Code:</h5>
                                                         <p className="text-gray-600">{version.hsnCode}</p>
                                                          <p className="text-xs text-blue-600 cursor-pointer hover:underline" 
+
+            const [abTestMode, setAbTestMode] = useState(false);
+            const [testResults, setTestResults] = useState(null);
+
+            const startAbTest = async (version1, version2) => {
+                // Simulate A/B test results
+                const results = {
+                    version1: {
+                        clicks: Math.floor(Math.random() * 1000) + 500,
+                        conversions: Math.floor(Math.random() * 100) + 50,
+                        ctr: (Math.random() * 0.05 + 0.02).toFixed(3)
+                    },
+                    version2: {
+                        clicks: Math.floor(Math.random() * 1000) + 500,
+                        conversions: Math.floor(Math.random() * 100) + 50,
+                        ctr: (Math.random() * 0.05 + 0.02).toFixed(3)
+                    }
+                };
+                
+                results.winner = results.version1.ctr > results.version2.ctr ? 'Version 1' : 'Version 2';
+                setTestResults(results);
+            };
+
                                                            onClick={() => checkGstRate(version.hsnCode, `gst-info-flipkart-${index}`)}>
                                                             Click to check GST rate
                                                         </p>

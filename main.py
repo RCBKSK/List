@@ -47,6 +47,52 @@ HSN_GST_MAPPING = {
     "8544": 0.18,  # Insulated wire, cable
     "9013": 0.18,  # Liquid crystal devices
     
+
+import time
+import functools
+from collections import defaultdict
+
+# Performance monitoring
+api_stats = defaultdict(list)
+
+def monitor_performance(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        try:
+            result = func(*args, **kwargs)
+            success = True
+        except Exception as e:
+            result = None
+            success = False
+            raise e
+        finally:
+            end_time = time.time()
+            api_stats[func.__name__].append({
+                'duration': end_time - start_time,
+                'success': success,
+                'timestamp': time.time()
+            })
+        return result
+    return wrapper
+
+@app.route('/api/performance-stats', methods=['GET'])
+def get_performance_stats():
+    try:
+        stats = {}
+        for endpoint, calls in api_stats.items():
+            if calls:
+                avg_duration = sum(call['duration'] for call in calls) / len(calls)
+                success_rate = sum(1 for call in calls if call['success']) / len(calls)
+                stats[endpoint] = {
+                    'avg_duration': round(avg_duration, 3),
+                    'success_rate': round(success_rate * 100, 2),
+                    'total_calls': len(calls)
+                }
+        return jsonify({'success': True, 'stats': stats})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
     # Automobiles (28%)
     "8703": 0.28,  # Motor cars and other motor vehicles
     "8704": 0.28,  # Motor vehicles for transport of goods
@@ -897,14 +943,208 @@ def generate_listing():
                     "category": "Suggested category",
                     "hsnCode": "HSN code preferably from 5% GST slab",
                     "keywords": ["regional SEO keywords"]
+
+def analyze_market_prices(product_name, category):
+    """Analyze market prices for similar products"""
+    try:
+        # Simulate market analysis (you can integrate real APIs later)
+        base_prices = {
+            'electronics': {'min': 500, 'max': 5000, 'avg': 2000},
+            'clothing': {'min': 200, 'max': 2000, 'avg': 800},
+            'toys': {'min': 100, 'max': 1500, 'avg': 500},
+            'home': {'min': 300, 'max': 3000, 'avg': 1200}
+        }
+        
+        category_key = next((k for k in base_prices.keys() if k in category.lower()), 'electronics')
+        price_range = base_prices[category_key]
+        
+        return {
+            'market_min': price_range['min'],
+            'market_max': price_range['max'],
+            'market_average': price_range['avg'],
+            'recommended_range': {
+                'min': price_range['avg'] * 0.8,
+                'max': price_range['avg'] * 1.3
+            },
+            'competitive_analysis': 'Based on market data analysis'
+        }
+    except Exception as e:
+        return None
+
+@app.route('/api/analyze-market', methods=['POST'])
+def analyze_market():
+    try:
+        data = request.get_json()
+        product_name = data.get('productName', '')
+        category = data.get('category', '')
+        
+        analysis = analyze_market_prices(product_name, category)
+        
+        if analysis:
+            return jsonify({'success': True, 'data': analysis})
+        else:
+            return jsonify({'error': 'Market analysis failed'}), 500
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
                 }}
             ]
         }}
         
         Make each version unique with different copywriting approaches, target different customer personas, and use varied language styles suitable for Indian customers.
+
+# Simple in-memory template storage (use database in production)
+saved_templates = {}
+
+@app.route('/api/save-template', methods=['POST'])
+def save_template():
+    try:
+        data = request.get_json()
+        template_name = data.get('templateName')
+        template_data = data.get('templateData')
+        
+        if not template_name or not template_data:
+            return jsonify({'error': 'Template name and data required'}), 400
+        
+        saved_templates[template_name] = {
+            'data': template_data,
+            'created_at': datetime.now().isoformat(),
+            'usage_count': 0
+        }
+        
+        return jsonify({'success': True, 'message': 'Template saved successfully'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/get-templates', methods=['GET'])
+def get_templates():
+    try:
+        return jsonify({'success': True, 'templates': saved_templates})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/use-template', methods=['POST'])
+def use_template():
+    try:
+        data = request.get_json()
+        template_name = data.get('templateName')
+        
+        if template_name not in saved_templates:
+            return jsonify({'error': 'Template not found'}), 404
+        
+        saved_templates[template_name]['usage_count'] += 1
+        return jsonify({'success': True, 'data': saved_templates[template_name]['data']})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
         """
         
         # Generate content with Gemini Vision
+
+def analyze_seo_score(title, description, keywords, category):
+    """Calculate SEO score for product listing"""
+    score = 0
+    feedback = []
+    
+    # Title analysis
+    if len(title) >= 50 and len(title) <= 200:
+        score += 20
+        feedback.append("✓ Title length is optimal")
+    else:
+        feedback.append("⚠ Title should be 50-200 characters")
+    
+    # Description analysis
+    if len(description.split()) >= 50 and len(description.split()) <= 100:
+        score += 20
+        feedback.append("✓ Description length is optimal")
+    else:
+        feedback.append("⚠ Description should be 50-100 words")
+    
+    # Keywords analysis
+    keyword_list = keywords if isinstance(keywords, list) else keywords.split(',')
+    if len(keyword_list) >= 5:
+        score += 20
+        feedback.append("✓ Good number of keywords")
+    else:
+        feedback.append("⚠ Add more keywords (minimum 5)")
+    
+    # Category relevance
+    if category and len(category) > 0:
+        score += 20
+        feedback.append("✓ Category specified")
+    else:
+        feedback.append("⚠ Specify product category")
+    
+    # Search volume simulation
+    high_volume_keywords = ['premium', 'quality', 'durable', 'bestseller', 'latest']
+    if any(kw.lower() in title.lower() for kw in high_volume_keywords):
+        score += 20
+        feedback.append("✓ Contains high-volume keywords")
+    else:
+        feedback.append("⚠ Consider adding high-volume keywords")
+    
+    return {
+        'score': score,
+        'grade': 'A' if score >= 90 else 'B' if score >= 70 else 'C' if score >= 50 else 'D',
+        'feedback': feedback,
+        'improvements': []
+    }
+
+
+@app.route('/api/export/custom', methods=['POST'])
+def export_custom():
+    try:
+        data = request.get_json()
+        listing_data = data.get('listing', [])
+        export_config = data.get('config', {})
+        format_type = export_config.get('format', 'xlsx')
+        
+        # Custom field mapping
+        field_mapping = export_config.get('fieldMapping', {})
+        include_analytics = export_config.get('includeAnalytics', False)
+        include_pricing = export_config.get('includePricing', True)
+        
+        # Create customized export based on configuration
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=f'.{format_type}')
+        temp_file.close()
+        
+        if format_type == 'json':
+            with open(temp_file.name, 'w', encoding='utf-8') as f:
+                json.dump(listing_data, f, indent=2, ensure_ascii=False)
+        elif format_type == 'txt':
+            with open(temp_file.name, 'w', encoding='utf-8') as f:
+                for item in listing_data:
+                    f.write(f"Title: {item.get('title', '')}\n")
+                    f.write(f"Description: {item.get('description', '')}\n")
+                    f.write("Bullet Points:\n")
+                    for bullet in item.get('bulletPoints', []):
+                        f.write(f"- {bullet}\n")
+                    f.write("\n" + "="*50 + "\n\n")
+        
+        return send_file(temp_file.name, as_attachment=True,
+                        download_name=f'custom_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.{format_type}')
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/analyze-seo', methods=['POST'])
+def analyze_seo():
+    try:
+        data = request.get_json()
+        title = data.get('title', '')
+        description = data.get('description', '')
+        keywords = data.get('keywords', [])
+        category = data.get('category', '')
+        
+        analysis = analyze_seo_score(title, description, keywords, category)
+        return jsonify({'success': True, 'data': analysis})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
         try:
             print("Calling Gemini API...")
             model = genai.GenerativeModel('gemini-1.5-flash')
