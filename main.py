@@ -13,6 +13,9 @@ import requests
 from bs4 import BeautifulSoup
 import re
 from urllib.parse import urlparse
+import time
+import functools
+from collections import defaultdict
 
 app = Flask(__name__)
 CORS(app)
@@ -30,7 +33,7 @@ HSN_GST_MAPPING = {
     "1001": 0.0,   # Wheat and meslin
     "1006": 0.0,   # Rice
     "1701": 0.05,  # Cane or beet sugar
-    
+
     # Textiles (5% - 12%)
     "5201": 0.05,  # Cotton, not carded or combed
     "5208": 0.05,  # Woven fabrics of cotton
@@ -38,18 +41,50 @@ HSN_GST_MAPPING = {
     "6201": 0.12,  # Women's or girls' overcoats
     "6301": 0.05,  # Blankets and travelling rugs
     "6302": 0.05,  # Bed linen, table linen
-    
+
     # Electronics (18% - 28%)
     "8471": 0.18,  # Automatic data processing machines
     "8517": 0.18,  # Telephone sets, mobile phones
     "8528": 0.18,  # Monitors and projectors
     "8544": 0.18,  # Insulated wire, cable
     "9013": 0.18,  # Liquid crystal devices
-    
 
-import time
-import functools
-from collections import defaultdict
+    # Automobiles (28%)
+    "8703": 0.28,  # Motor cars and other motor vehicles
+    "8704": 0.28,  # Motor vehicles for transport of goods
+    "8711": 0.28,  # Motorcycles
+
+    # Chemicals (5% - 18%)
+    "2501": 0.05,  # Salt
+    "2804": 0.05,  # Hydrogen, rare gases
+    "3004": 0.12,  # Medicaments
+    "3303": 0.18,  # Perfumes and toilet waters
+    "3401": 0.18,  # Soap
+
+    # Books and stationery (0% - 12%)
+    "4901": 0.0,   # Printed books, brochures
+    "4902": 0.0,   # Newspapers, journals
+    "4910": 0.05,  # Calendars of any kind
+    "4911": 0.12,  # Other printed matter
+
+    # Common HSN codes for various products
+    "3926": 0.18,  # Other articles of plastics
+    "4202": 0.18,  # Trunks, suit-cases, handbags
+    "6403": 0.18,  # Footwear with outer soles of rubber
+    "7013": 0.18,  # Glassware of a kind used for table
+    "7323": 0.18,  # Table, kitchen or other household articles
+    "8302": 0.18,  # Base metal mountings, fittings
+    "8443": 0.18,  # Printing machinery
+    "9403": 0.12,  # Other furniture and parts thereof
+    "9404": 0.12,  # Mattress supports; articles of bedding
+    "9405": 0.12,  # Lamps and lighting fittings
+    "9503": 0.12,  # Tricycles, scooters, pedal cars (toys)
+    "9504": 0.28,  # Video game consoles and machines
+    "9505": 0.12,  # Festive, carnival or other entertainment articles
+
+    # Default/Unknown HSN codes
+    "9999": 0.18,  # Default rate for unknown items
+}
 
 # Performance monitoring
 api_stats = defaultdict(list)
@@ -92,43 +127,6 @@ def get_performance_stats():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-    # Automobiles (28%)
-    "8703": 0.28,  # Motor cars and other motor vehicles
-    "8704": 0.28,  # Motor vehicles for transport of goods
-    "8711": 0.28,  # Motorcycles
-    
-    # Chemicals (5% - 18%)
-    "2501": 0.05,  # Salt
-    "2804": 0.05,  # Hydrogen, rare gases
-    "3004": 0.12,  # Medicaments
-    "3303": 0.18,  # Perfumes and toilet waters
-    "3401": 0.18,  # Soap
-    
-    # Books and stationery (0% - 12%)
-    "4901": 0.0,   # Printed books, brochures
-    "4902": 0.0,   # Newspapers, journals
-    "4910": 0.05,  # Calendars of any kind
-    "4911": 0.12,  # Other printed matter
-    
-    # Common HSN codes for various products
-    "3926": 0.18,  # Other articles of plastics
-    "4202": 0.18,  # Trunks, suit-cases, handbags
-    "6403": 0.18,  # Footwear with outer soles of rubber
-    "7013": 0.18,  # Glassware of a kind used for table
-    "7323": 0.18,  # Table, kitchen or other household articles
-    "8302": 0.18,  # Base metal mountings, fittings
-    "8443": 0.18,  # Printing machinery
-    "9403": 0.12,  # Other furniture and parts thereof
-    "9404": 0.12,  # Mattress supports; articles of bedding
-    "9405": 0.12,  # Lamps and lighting fittings
-    "9503": 0.12,  # Tricycles, scooters, pedal cars (toys)
-    "9504": 0.28,  # Video game consoles and machines
-    "9505": 0.12,  # Festive, carnival or other entertainment articles
-    
-    # Default/Unknown HSN codes
-    "9999": 0.18,  # Default rate for unknown items
-}
-
 def get_gst_rate_from_hsn_api(hsn_code):
     """
     Get GST rate from ClearTax Algolia API
@@ -136,13 +134,13 @@ def get_gst_rate_from_hsn_api(hsn_code):
     """
     if not hsn_code:
         return 0.18, "Default GST rate (18%)", None
-    
+
     hsn_clean = str(hsn_code).replace(" ", "").strip()
-    
+
     try:
         # ClearTax Algolia API request
         api_url = "https://cleartax.in/f/content_search/algolia/algolia-search/"
-        
+
         payload = {
             "requests": [
                 {
@@ -151,52 +149,52 @@ def get_gst_rate_from_hsn_api(hsn_code):
                 }
             ]
         }
-        
+
         headers = {
             'Content-Type': 'application/json',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
-        
+
         response = requests.post(api_url, json=payload, headers=headers, timeout=10)
-        
+
         if response.status_code == 200:
             data = response.json()
             results = data.get('results', [])
-            
+
             if results and len(results) > 0:
                 hits = results[0].get('hits', [])
-                
+
                 if hits:
                     # Find exact or best match
                     best_match = None
                     exact_match = None
-                    
+
                     for hit in hits:
                         hit_hsn = hit.get('product_hsn_code', '')
-                        
+
                         # Check for exact match
                         if hit_hsn == hsn_clean or hit_hsn.startswith(hsn_clean):
                             exact_match = hit
                             break
-                        
+
                         # Keep track of best partial match
                         if not best_match and hsn_clean in hit_hsn:
                             best_match = hit
-                    
+
                     # Use exact match if found, otherwise best match
                     selected_hit = exact_match or best_match or hits[0]
-                    
+
                     product_rate = selected_hit.get('product_rate', '18%')
                     product_description = selected_hit.get('product_description', '')
                     chapter_name = selected_hit.get('chapter_name', '')
                     product_hsn_code = selected_hit.get('product_hsn_code', hsn_clean)
-                    
+
                     # Extract GST rate percentage
                     gst_percentage = float(product_rate.replace('%', '')) if product_rate.replace('%', '').replace('.', '').isdigit() else 18.0
                     gst_rate = gst_percentage / 100
-                    
+
                     description = f"HSN {product_hsn_code}: {gst_percentage}% GST - {chapter_name}"
-                    
+
                     return gst_rate, description, {
                         'hsnCode': product_hsn_code,
                         'gstRate': gst_percentage,
@@ -204,10 +202,10 @@ def get_gst_rate_from_hsn_api(hsn_code):
                         'chapterName': chapter_name,
                         'source': 'ClearTax API'
                     }
-    
+
     except Exception as e:
         print(f"Error fetching from ClearTax API: {e}")
-    
+
     # Fallback to local mapping if API fails
     return get_gst_rate_from_hsn_local(hsn_code)
 
@@ -218,10 +216,10 @@ def get_gst_rate_from_hsn_local(hsn_code):
     """
     if not hsn_code:
         return 0.18, "Default GST rate (18%)", None
-    
+
     # Clean HSN code - remove spaces and convert to string
     hsn_clean = str(hsn_code).replace(" ", "").strip()
-    
+
     # Try exact match first
     if hsn_clean in HSN_GST_MAPPING:
         rate = HSN_GST_MAPPING[hsn_clean]
@@ -231,7 +229,7 @@ def get_gst_rate_from_hsn_local(hsn_code):
             'description': 'Local mapping',
             'source': 'Local Database'
         }
-    
+
     # Try partial match for 4-digit HSN codes (match first 4 digits)
     if len(hsn_clean) >= 4:
         hsn_4digit = hsn_clean[:4]
@@ -243,7 +241,7 @@ def get_gst_rate_from_hsn_local(hsn_code):
                 'description': f'Matched from {hsn_clean}',
                 'source': 'Local Database'
             }
-    
+
     # Try partial match for 2-digit HSN codes (match first 2 digits)
     if len(hsn_clean) >= 2:
         hsn_2digit = hsn_clean[:2]
@@ -259,7 +257,7 @@ def get_gst_rate_from_hsn_local(hsn_code):
                 'description': f'Category estimate from {hsn_clean}',
                 'source': 'Local Database'
             }
-    
+
     # Default to 18% if no match found
     return 0.18, f"HSN {hsn_clean}: 18% GST (default rate - unknown HSN)", {
         'hsnCode': hsn_clean,
@@ -293,34 +291,34 @@ def scrape_product_data(url):
             'Connection': 'keep-alive',
             'Upgrade-Insecure-Requests': '1'
         }
-        
+
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
         print(f"Response status: {response.status_code}, Content length: {len(response.content)}")
-        
+
         soup = BeautifulSoup(response.content, 'html.parser')
         domain = urlparse(url).netloc.lower()
         print(f"Domain detected: {domain}")
-        
+
         # Find all text containing "weight" or "dimension" for debugging
         page_text = soup.get_text()
         weight_mentions = [line.strip() for line in page_text.split('\n') if 'weight' in line.lower() and line.strip()]
         dimension_mentions = [line.strip() for line in page_text.split('\n') if any(word in line.lower() for word in ['dimension', 'size', 'length', 'width', 'height']) and line.strip() and len(line.strip()) < 200]
-        
+
         print(f"Found {len(weight_mentions)} weight mentions")
         print(f"Found {len(dimension_mentions)} dimension mentions")
         if weight_mentions:
             print(f"Sample weight mentions: {weight_mentions[:3]}")
         if dimension_mentions:
             print(f"Sample dimension mentions: {dimension_mentions[:3]}")
-        
+
         product_data = {
             'weight': None,
             'dimensions': {'length': None, 'width': None, 'height': None},
             'brand': None,
             'title': None
         }
-        
+
         # Amazon scraping
         if 'amazon.' in domain:
             print("Using Amazon scraper")
@@ -337,10 +335,10 @@ def scrape_product_data(url):
         else:
             print("Using generic scraper")
             product_data = scrape_generic(soup)
-        
+
         print(f"Final scraped data: {product_data}")
         return product_data
-        
+
     except Exception as e:
         print(f"Error scraping product data: {e}")
         import traceback
@@ -350,7 +348,7 @@ def scrape_product_data(url):
 def scrape_amazon(soup):
     """Scrape Amazon product page"""
     data = {'weight': None, 'dimensions': {'length': None, 'width': None, 'height': None}, 'brand': None, 'title': None}
-    
+
     # Enhanced title extraction with more selectors
     title_selectors = [
         {'id': 'productTitle'},
@@ -362,7 +360,7 @@ def scrape_amazon(soup):
         'span#productTitle',
         '[data-automation-id="product-title"]'
     ]
-    
+
     # Try multiple approaches for title
     for selector in title_selectors:
         try:
@@ -375,13 +373,13 @@ def scrape_amazon(soup):
                 break
         except:
             continue
-    
+
     # Fallback: search for title in meta tags
     if not data['title']:
         meta_title = soup.find('meta', {'property': 'og:title'}) or soup.find('meta', {'name': 'title'})
         if meta_title and meta_title.get('content'):
             data['title'] = meta_title.get('content').strip()[:200]
-    
+
     # Enhanced brand extraction
     brand_selectors = [
         {'class': 'a-spacing-small po-brand'},
@@ -392,14 +390,14 @@ def scrape_amazon(soup):
         'tr.a-spacing-small.po-brand td.a-span9 span.a-offscreen',
         '[data-testid="brand-name"]'
     ]
-    
+
     for selector in brand_selectors:
         try:
             if isinstance(selector, dict):
                 brand_elem = soup.find('tr', selector) or soup.find('span', selector) or soup.find('div', selector) or soup.find('td', selector)
             else:
                 brand_elem = soup.select_one(selector)
-            
+
             if brand_elem:
                 # Try different ways to extract brand text
                 brand_text = None
@@ -410,13 +408,13 @@ def scrape_amazon(soup):
                     brand_text = brand_elem.find('a').get_text().strip()
                 else:
                     brand_text = brand_elem.get_text().strip()
-                
+
                 if brand_text and len(brand_text) < 50:  # Reasonable brand name length
                     data['brand'] = brand_text
                     break
         except:
             continue
-    
+
     # Fallback: look for brand in the page text using patterns
     if not data['brand']:
         page_text = soup.get_text()
@@ -425,7 +423,7 @@ def scrape_amazon(soup):
             r'by\s+([A-Za-z0-9\s&-]+?)(?:\n|\s{2,})',
             r'Manufacturer[:\s]+([A-Za-z0-9\s&-]+?)(?:\n|;)'
         ]
-        
+
         for pattern in brand_patterns:
             brand_match = re.search(pattern, page_text, re.IGNORECASE)
             if brand_match:
@@ -433,7 +431,7 @@ def scrape_amazon(soup):
                 if len(brand_candidate) < 50 and brand_candidate:
                     data['brand'] = brand_candidate
                     break
-    
+
     # Comprehensive product details extraction
     detail_sections = [
         soup.find('table', {'id': 'productDetails_detailBullets_sections1'}),
@@ -445,13 +443,13 @@ def scrape_amazon(soup):
         soup.find('table', {'class': 'a-keyvalue prodDetTable'}),
         soup.find('div', {'data-hook': 'product-details'})
     ]
-    
+
     # Get page text for fallback extraction
     page_text = soup.get_text()
     page_text_lower = page_text.lower()
-    
+
     print(f"Page text preview: {page_text[:500]}")  # Debug log
-    
+
     # Enhanced weight extraction with more patterns
     weight_patterns = [
         r'item\s+weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g|pounds?|lbs?|oz)\b',
@@ -462,14 +460,14 @@ def scrape_amazon(soup):
         r'weight[:\s]*(\d+(?:\.\d+)?)\s*([kKgG])\b',
         r'net\s+weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g|pounds?|lbs?|oz)\b'
     ]
-    
+
     for pattern in weight_patterns:
         weight_match = re.search(pattern, page_text, re.IGNORECASE)
         if weight_match:
             try:
                 weight_val = float(weight_match.group(1))
                 unit = weight_match.group(2).lower()
-                
+
                 # Convert to kg
                 if unit in ['g', 'gram', 'grams']:
                     weight_val = weight_val / 1000
@@ -479,14 +477,14 @@ def scrape_amazon(soup):
                     weight_val = weight_val * 0.0283495
                 elif unit in ['k', 'kg', 'kilogram', 'kilograms']:
                     pass  # Already in kg
-                
+
                 if 0.001 <= weight_val <= 1000:  # Reasonable weight range
                     data['weight'] = round(weight_val, 3)
                     print(f"Found weight: {data['weight']} kg")
                     break
             except ValueError:
                 continue
-    
+
     # Enhanced dimension extraction with more patterns
     dimension_patterns = [
         r'product\s+dimensions[:\s]*(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)',
@@ -497,7 +495,7 @@ def scrape_amazon(soup):
         r'(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)\s*(?:cm|centimeter|mm|millimeter|inch|inches|in)',
         r'(\d+(?:\.\d+)?)\s*cm\s*[×x]\s*(\d+(?:\.\d+)?)\s*cm\s*[×x]\s*(\d+(?:\.\d+)?)\s*cm'
     ]
-    
+
     for pattern in dimension_patterns:
         dim_match = re.search(pattern, page_text, re.IGNORECASE)
         if dim_match:
@@ -505,7 +503,7 @@ def scrape_amazon(soup):
                 length = float(dim_match.group(1))
                 width = float(dim_match.group(2))
                 height = float(dim_match.group(3))
-                
+
                 # Reasonable dimension range (0.1cm to 500cm)
                 if all(0.1 <= dim <= 500 for dim in [length, width, height]):
                     data['dimensions'] = {
@@ -517,12 +515,12 @@ def scrape_amazon(soup):
                     break
             except ValueError:
                 continue
-    
+
     # Try structured data extraction from detail sections
     for detail_section in detail_sections:
         if not detail_section:
             continue
-            
+
         if detail_section.name == 'table':
             rows = detail_section.find_all('tr')
             for row in rows:
@@ -531,7 +529,7 @@ def scrape_amazon(soup):
                 if label and value:
                     label_text = label.get_text().strip().lower()
                     value_text = value.get_text().strip()
-                    
+
                     if not data['weight'] and 'weight' in label_text:
                         weight_match = re.search(r'(\d+(?:\.\d+)?)\s*(kg|grams?|g|pounds?|lbs?)\b', value_text, re.IGNORECASE)
                         if weight_match:
@@ -542,7 +540,7 @@ def scrape_amazon(soup):
                             elif unit in ['pounds', 'lbs', 'lb']:
                                 weight_val = weight_val * 0.453592
                             data['weight'] = round(weight_val, 2)
-                    
+
                     if not any(data['dimensions'].values()) and 'dimension' in label_text:
                         dim_match = re.findall(r'(\d+(?:\.\d+)?)', value_text)
                         if len(dim_match) >= 3:
@@ -551,7 +549,7 @@ def scrape_amazon(soup):
                                 'width': float(dim_match[1]),
                                 'height': float(dim_match[2])
                             }
-        
+
         elif detail_section.name in ['div', 'ul']:
             # Look for spans or list items containing weight/dimension info
             all_text = detail_section.get_text()
@@ -565,13 +563,13 @@ def scrape_amazon(soup):
                     elif unit in ['pounds', 'lbs', 'lb']:
                         weight_val = weight_val * 0.453592
                     data['weight'] = round(weight_val, 2)
-    
+
     return data
 
 def scrape_flipkart(soup):
     """Scrape Flipkart product page"""
     data = {'weight': None, 'dimensions': {'length': None, 'width': None, 'height': None}, 'brand': None, 'title': None}
-    
+
     # Title - multiple selectors
     title_selectors = [
         {'class': 'B_NuCI'},
@@ -579,7 +577,7 @@ def scrape_flipkart(soup):
         {'class': 'yhB1nd'},
         'h1'
     ]
-    
+
     for selector in title_selectors:
         if isinstance(selector, dict):
             title_elem = soup.find('span', selector) or soup.find('h1', selector)
@@ -588,22 +586,22 @@ def scrape_flipkart(soup):
         if title_elem:
             data['title'] = title_elem.get_text().strip()
             break
-    
+
     # Brand
     brand_elem = soup.find('a', class_='_2b3wE_') or soup.find('span', class_='_2b3wE_')
     if brand_elem:
         data['brand'] = brand_elem.get_text().strip()
-    
+
     # Search in page text for weight and dimensions
     page_text = soup.get_text().lower()
-    
+
     # Weight extraction
     weight_patterns = [
         r'item weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g)\b',
         r'product weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g)\b',
         r'weight[:\s]*(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g)\b'
     ]
-    
+
     for pattern in weight_patterns:
         weight_match = re.search(pattern, page_text, re.IGNORECASE)
         if weight_match:
@@ -613,13 +611,13 @@ def scrape_flipkart(soup):
                 weight_val = weight_val / 1000
             data['weight'] = round(weight_val, 2)
             break
-    
+
     # Dimensions extraction
     dimension_patterns = [
         r'dimensions[:\s]*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)',
         r'size[:\s]*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)'
     ]
-    
+
     for pattern in dimension_patterns:
         dim_match = re.search(pattern, page_text, re.IGNORECASE)
         if dim_match:
@@ -629,14 +627,14 @@ def scrape_flipkart(soup):
                 'height': float(dim_match.group(3))
             }
             break
-    
+
     # Specifications table
     spec_selectors = [
         {'class': '_14cfVK'},
         {'class': '_1UhVsV'},
         {'class': 'col col-3-12 _2H87wv'}
     ]
-    
+
     for selector in spec_selectors:
         spec_tables = soup.find_all('table', selector)
         for table in spec_tables:
@@ -646,7 +644,7 @@ def scrape_flipkart(soup):
                 if len(cells) >= 2:
                     label = cells[0].get_text().strip().lower()
                     value = cells[1].get_text().strip()
-                    
+
                     if not data['weight'] and 'weight' in label:
                         weight_match = re.search(r'(\d+(?:\.\d+)?)\s*(kg|grams?|g)\b', value, re.IGNORECASE)
                         if weight_match:
@@ -655,7 +653,7 @@ def scrape_flipkart(soup):
                             if unit in ['g', 'gram', 'grams']:
                                 weight_val = weight_val / 1000
                             data['weight'] = round(weight_val, 2)
-                    
+
                     if not any(data['dimensions'].values()) and 'dimension' in label:
                         dim_match = re.findall(r'(\d+(?:\.\d+)?)', value)
                         if len(dim_match) >= 3:
@@ -664,29 +662,29 @@ def scrape_flipkart(soup):
                                 'width': float(dim_match[1]),
                                 'height': float(dim_match[2])
                             }
-    
+
     return data
 
 def scrape_meesho(soup):
     """Scrape Meesho product page"""
     data = {'weight': None, 'dimensions': {'length': None, 'width': None, 'height': None}, 'brand': None, 'title': None}
-    
+
     # Basic implementation for Meesho
     title_elem = soup.find('h1')
     if title_elem:
         data['title'] = title_elem.get_text().strip()
-    
+
     return data
 
 def scrape_generic(soup):
     """Generic scraping for other sites"""
     data = {'weight': None, 'dimensions': {'length': None, 'width': None, 'height': None}, 'brand': None, 'title': None}
-    
+
     # Try to find title
     title_elem = soup.find('h1') or soup.find('title')
     if title_elem:
         data['title'] = title_elem.get_text().strip()
-    
+
     return data
 
 def calculate_marketplace_shipping(weight, dimensions, marketplace='amazon'):
@@ -694,19 +692,19 @@ def calculate_marketplace_shipping(weight, dimensions, marketplace='amazon'):
     length = dimensions.get('length', 0)
     width = dimensions.get('width', 0) 
     height = dimensions.get('height', 0)
-    
+
     # Calculate volumetric weight
     volumetric_weight = (length * width * height) / 5000 if all([length, width, height]) else 0
-    
+
     # Use higher of actual weight or volumetric weight
     chargeable_weight = max(weight or 0, volumetric_weight)
-    
+
     shipping_costs = {
         'amazon': calculate_amazon_shipping(chargeable_weight, dimensions),
         'flipkart': calculate_flipkart_shipping(chargeable_weight, dimensions),
         'meesho': calculate_meesho_shipping(chargeable_weight, dimensions)
     }
-    
+
     if marketplace == 'all':
         return shipping_costs
     else:
@@ -732,7 +730,7 @@ def calculate_amazon_shipping(weight, dimensions):
         local_shipping = 80 + (additional_kg * 25)
         regional_shipping = 95 + (additional_kg * 30)
         national_shipping = 115 + (additional_kg * 40)
-    
+
     return {
         'local': round(local_shipping, 2),
         'regional': round(regional_shipping, 2),
@@ -751,7 +749,7 @@ def calculate_flipkart_shipping(weight, dimensions):
     else:
         additional_kg = weight - 2
         shipping = 100 + (additional_kg * 30)
-    
+
     return {
         'local': round(shipping * 0.8, 2),
         'regional': round(shipping, 2),
@@ -770,7 +768,7 @@ def calculate_meesho_shipping(weight, dimensions):
     else:
         additional_kg = weight - 2
         shipping = 85 + (additional_kg * 25)
-    
+
     return {
         'local': round(shipping * 0.7, 2),
         'regional': round(shipping * 0.9, 2),
@@ -788,22 +786,22 @@ def generate_listing():
         print("Starting generate_listing...")
         data = request.get_json()
         print(f"Received data keys: {data.keys() if data else 'No data'}")
-        
+
         if not genai_api_key:
             print("Error: Gemini API key not configured")
             return jsonify({'error': 'Gemini API key not configured'}), 400
-        
+
         # Get image data
         image_data = data.get('image')
         if not image_data:
             print("Error: No image provided")
             return jsonify({'error': 'No image provided'}), 400
-        
+
         print("Processing image data...")
         # Remove data URL prefix if present
         if 'base64,' in image_data:
             image_data = image_data.split('base64,')[1]
-        
+
         # Decode base64 image
         try:
             image_bytes = base64.b64decode(image_data)
@@ -812,7 +810,7 @@ def generate_listing():
         except Exception as img_error:
             print(f"Image processing error: {img_error}")
             return jsonify({'error': f'Image processing failed: {str(img_error)}'}), 400
-        
+
         # Get additional product info
         product_info = data.get('productInfo', {})
         product_name = product_info.get('name', '')
@@ -820,18 +818,18 @@ def generate_listing():
         dimensions = product_info.get('dimensions', '')
         cost_price = product_info.get('costPrice', 0)
         print(f"Product info: name={product_name}, brand={brand}")
-        
+
         # Create prompt for Gemini
         prompt = f"""
         Analyze this product image and generate 3 different e-commerce listing versions for Indian marketplaces (Amazon, Flipkart, Meesho).
         Each version should have different copywriting styles and target different customer segments.
-        
+
         Additional product information:
         - Product Name: {product_name}
         - Brand: {brand}
         - Dimensions: {dimensions}
         - Cost Price: ₹{cost_price}
-        
+
         For HSN codes, please provide accurate 4-6 digit HSN codes based on the actual product category. Common examples:
         - Electronics/Mobile phones: 8517 (18% GST)
         - Toys and games: 9503 (12% GST for most toys, 18% for electronic toys)
@@ -843,9 +841,9 @@ def generate_listing():
         - Kitchen items/utensils: 7323 (18% GST)
         - Cosmetics: 3303-3307 (18% GST)
         - Sports goods: 9506 (18% GST)
-        
+
         Please analyze the product image carefully and assign the most appropriate HSN code based on the actual product category and material.
-        
+
         Please provide a JSON response with the following structure:
         {{
             "amazon": [
@@ -953,10 +951,10 @@ def analyze_market_prices(product_name, category):
             'toys': {'min': 100, 'max': 1500, 'avg': 500},
             'home': {'min': 300, 'max': 3000, 'avg': 1200}
         }
-        
+
         category_key = next((k for k in base_prices.keys() if k in category.lower()), 'electronics')
         price_range = base_prices[category_key]
-        
+
         return {
             'market_min': price_range['min'],
             'market_max': price_range['max'],
@@ -976,22 +974,75 @@ def analyze_market():
         data = request.get_json()
         product_name = data.get('productName', '')
         category = data.get('category', '')
-        
+
         analysis = analyze_market_prices(product_name, category)
-        
+
         if analysis:
             return jsonify({'success': True, 'data': analysis})
         else:
             return jsonify({'error': 'Market analysis failed'}), 500
-            
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
                 }}
             ]
         }}
-        
+
         Make each version unique with different copywriting approaches, target different customer personas, and use varied language styles suitable for Indian customers.
+
+        """
+
+        # Generate content with Gemini Vision
+
+def analyze_seo_score(title, description, keywords, category):
+    """Calculate SEO score for product listing"""
+    score = 0
+    feedback = []
+
+    # Title analysis
+    if len(title) >= 50 and len(title) <= 200:
+        score += 20
+        feedback.append("✓ Title length is optimal")
+    else:
+        feedback.append("⚠ Title should be 50-200 characters")
+
+    # Description analysis
+    if len(description.split()) >= 50 and len(description.split()) <= 100:
+        score += 20
+        feedback.append("✓ Description length is optimal")
+    else:
+        feedback.append("⚠ Description should be 50-100 words")
+
+    # Keywords analysis
+    keyword_list = keywords if isinstance(keywords, list) else keywords.split(',')
+    if len(keyword_list) >= 5:
+        score += 20
+        feedback.append("✓ Good number of keywords")
+    else:
+        feedback.append("⚠ Add more keywords (minimum 5)")
+
+    # Category relevance
+    if category and len(category) > 0:
+        score += 20
+        feedback.append("✓ Category specified")
+    else:
+        feedback.append("⚠ Specify product category")
+
+    # Search volume simulation
+    high_volume_keywords = ['premium', 'quality', 'durable', 'bestseller', 'latest']
+    if any(kw.lower() in title.lower() for kw in high_volume_keywords):
+        score += 20
+        feedback.append("✓ Contains high-volume keywords")
+    else:
+        feedback.append("⚠ Consider adding high-volume keywords")
+
+    return {
+        'score': score,
+        'grade': 'A' if score >= 90 else 'B' if score >= 70 else 'C' if score >= 50 else 'D',
+        'feedback': feedback,
+        'improvements': []
+    }
 
 # Simple in-memory template storage (use database in production)
 saved_templates = {}
@@ -1002,18 +1053,18 @@ def save_template():
         data = request.get_json()
         template_name = data.get('templateName')
         template_data = data.get('templateData')
-        
+
         if not template_name or not template_data:
             return jsonify({'error': 'Template name and data required'}), 400
-        
+
         saved_templates[template_name] = {
             'data': template_data,
             'created_at': datetime.now().isoformat(),
             'usage_count': 0
         }
-        
+
         return jsonify({'success': True, 'message': 'Template saved successfully'})
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1029,69 +1080,30 @@ def use_template():
     try:
         data = request.get_json()
         template_name = data.get('templateName')
-        
+
         if template_name not in saved_templates:
             return jsonify({'error': 'Template not found'}), 404
-        
+
         saved_templates[template_name]['usage_count'] += 1
         return jsonify({'success': True, 'data': saved_templates[template_name]['data']})
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-        """
-        
-        # Generate content with Gemini Vision
+@app.route('/api/analyze-seo', methods=['POST'])
+def analyze_seo():
+    try:
+        data = request.get_json()
+        title = data.get('title', '')
+        description = data.get('description', '')
+        keywords = data.get('keywords', [])
+        category = data.get('category', '')
 
-def analyze_seo_score(title, description, keywords, category):
-    """Calculate SEO score for product listing"""
-    score = 0
-    feedback = []
-    
-    # Title analysis
-    if len(title) >= 50 and len(title) <= 200:
-        score += 20
-        feedback.append("✓ Title length is optimal")
-    else:
-        feedback.append("⚠ Title should be 50-200 characters")
-    
-    # Description analysis
-    if len(description.split()) >= 50 and len(description.split()) <= 100:
-        score += 20
-        feedback.append("✓ Description length is optimal")
-    else:
-        feedback.append("⚠ Description should be 50-100 words")
-    
-    # Keywords analysis
-    keyword_list = keywords if isinstance(keywords, list) else keywords.split(',')
-    if len(keyword_list) >= 5:
-        score += 20
-        feedback.append("✓ Good number of keywords")
-    else:
-        feedback.append("⚠ Add more keywords (minimum 5)")
-    
-    # Category relevance
-    if category and len(category) > 0:
-        score += 20
-        feedback.append("✓ Category specified")
-    else:
-        feedback.append("⚠ Specify product category")
-    
-    # Search volume simulation
-    high_volume_keywords = ['premium', 'quality', 'durable', 'bestseller', 'latest']
-    if any(kw.lower() in title.lower() for kw in high_volume_keywords):
-        score += 20
-        feedback.append("✓ Contains high-volume keywords")
-    else:
-        feedback.append("⚠ Consider adding high-volume keywords")
-    
-    return {
-        'score': score,
-        'grade': 'A' if score >= 90 else 'B' if score >= 70 else 'C' if score >= 50 else 'D',
-        'feedback': feedback,
-        'improvements': []
-    }
+        analysis = analyze_seo_score(title, description, keywords, category)
+        return jsonify({'success': True, 'data': analysis})
 
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/export/custom', methods=['POST'])
 def export_custom():
@@ -1100,16 +1112,16 @@ def export_custom():
         listing_data = data.get('listing', [])
         export_config = data.get('config', {})
         format_type = export_config.get('format', 'xlsx')
-        
+
         # Custom field mapping
         field_mapping = export_config.get('fieldMapping', {})
         include_analytics = export_config.get('includeAnalytics', False)
         include_pricing = export_config.get('includePricing', True)
-        
+
         # Create customized export based on configuration
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=f'.{format_type}')
         temp_file.close()
-        
+
         if format_type == 'json':
             with open(temp_file.name, 'w', encoding='utf-8') as f:
                 json.dump(listing_data, f, indent=2, ensure_ascii=False)
@@ -1122,25 +1134,10 @@ def export_custom():
                     for bullet in item.get('bulletPoints', []):
                         f.write(f"- {bullet}\n")
                     f.write("\n" + "="*50 + "\n\n")
-        
+
         return send_file(temp_file.name, as_attachment=True,
                         download_name=f'custom_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.{format_type}')
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
-@app.route('/api/analyze-seo', methods=['POST'])
-def analyze_seo():
-    try:
-        data = request.get_json()
-        title = data.get('title', '')
-        description = data.get('description', '')
-        keywords = data.get('keywords', [])
-        category = data.get('category', '')
-        
-        analysis = analyze_seo_score(title, description, keywords, category)
-        return jsonify({'success': True, 'data': analysis})
-        
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1152,14 +1149,14 @@ def analyze_seo():
         except Exception as api_error:
             print(f"Gemini API error: {api_error}")
             return jsonify({'error': f'Gemini API call failed: {str(api_error)}'}), 500
-        
+
         # Parse the response
         try:
             print("Parsing Gemini response...")
             # Extract JSON from response
             response_text = response.text
             print(f"Raw response: {response_text[:200]}...")
-            
+
             if '```json' in response_text:
                 json_start = response_text.find('```json') + 7
                 json_end = response_text.find('```', json_start)
@@ -1168,7 +1165,7 @@ def analyze_seo():
                 json_start = response_text.find('{')
                 json_end = response_text.rfind('}') + 1
                 response_text = response_text[json_start:json_end]
-            
+
             listing_data = json.loads(response_text)
             print("JSON parsing successful")
         except Exception as parse_error:
@@ -1273,10 +1270,10 @@ def analyze_seo():
                 ]
             }
             print("Using fallback listing data")
-        
+
         print("Returning successful response")
         return jsonify({'success': True, 'data': listing_data})
-        
+
     except Exception as e:
         print(f"Unexpected error in generate_listing: {e}")
         import traceback
@@ -1287,49 +1284,49 @@ def analyze_seo():
 def calculate_price():
     try:
         data = request.get_json()
-        
+
         cost_price = float(data.get('costPrice', 0))
         profit_margin = float(data.get('profitMargin', 42.5)) / 100
         hsn_code = data.get('hsnCode', '9999')  # Get HSN code from request
         marketplace = data.get('marketplace', 'amazon')
-        
+
         # Get GST rate based on HSN code
         gst_rate, gst_description = get_gst_rate_from_hsn(hsn_code)
-        
+
         # Get weight and dimensions
         weight = float(data.get('weight', 0))
         length = float(data.get('length', 0))
         width = float(data.get('width', 0))
         height = float(data.get('height', 0))
-        
+
         dimensions = {'length': length, 'width': width, 'height': height}
-        
+
         # Calculate marketplace-specific shipping
         shipping_data = calculate_marketplace_shipping(weight, dimensions, 'all')
-        
+
         # Platform commission rates
         commission_rates = {
             'amazon': 0.15,  # 15%
             'flipkart': 0.12,  # 12%
             'meesho': 0.08   # 8%
         }
-        
+
         price_breakdowns = {}
-        
+
         for platform, shipping_info in shipping_data.items():
             platform_commission = commission_rates.get(platform, 0.15)
             avg_shipping = shipping_info['average']
-            
+
             # Price calculation
             cost_with_gst = cost_price * (1 + gst_rate)
             target_profit = cost_price * profit_margin
-            
+
             # Calculate selling price considering all costs
             base_price = cost_with_gst + target_profit + avg_shipping
             final_price = base_price / (1 - platform_commission)
-            
+
             mrp = final_price * 1.2  # 20% above selling price for MRP
-            
+
             price_breakdowns[platform] = {
                 'costPrice': cost_price,
                 'gst': round(cost_price * gst_rate, 2),
@@ -1346,9 +1343,9 @@ def calculate_price():
                 'weight': weight,
                 'volumetricWeight': round((length * width * height) / 5000, 2) if all([length, width, height]) else 0
             }
-        
+
         return jsonify({'success': True, 'data': price_breakdowns})
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1358,23 +1355,23 @@ def export_listing(format):
         data = request.get_json()
         listing_versions = data.get('listing', [])
         pricing = data.get('pricing', {})
-        
+
         print(f"Export format: {format}")
         print(f"Listing versions: {len(listing_versions) if isinstance(listing_versions, list) else 'single listing'}")
         print(f"Pricing data: {pricing}")
-        
+
         # Handle both single listing (manual mode) and multiple versions (AI mode)
         if not isinstance(listing_versions, list):
             listing_versions = [listing_versions]
-        
+
         if not listing_versions or not listing_versions[0]:
             return jsonify({'error': 'No listing data provided'}), 400
-        
+
         # Create temporary file with proper extension
         file_extension = 'xlsx' if format in ['amazon', 'meesho'] else 'csv'
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_extension}')
         temp_file.close()  # Close the file so pandas can write to it
-        
+
         try:
             if format == 'amazon':
                 # Amazon Flat File format with multiple versions
@@ -1393,7 +1390,7 @@ def export_listing(format):
                     'Keywords': [],
                     'HSN Code': []
                 }
-                
+
                 for version in listing_versions:
                     amazon_data['Version'].append(version.get('version', 1))
                     amazon_data['Style'].append(version.get('style', 'Standard'))
@@ -1402,7 +1399,7 @@ def export_listing(format):
                     bullets = version.get('bulletPoints', [])
                     for i in range(5):
                         amazon_data[f'Bullet Point {i+1}'].append(bullets[i] if i < len(bullets) else '')
-                    
+
                     # Handle missing pricing data gracefully
                     if pricing and pricing.get('amazon'):
                         amazon_data['Standard Price'].append(pricing.get('amazon', {}).get('mrp', 0))
@@ -1410,15 +1407,15 @@ def export_listing(format):
                     else:
                         amazon_data['Standard Price'].append(0)
                         amazon_data['Sale Price'].append(0)
-                    
+
                     keywords = version.get('keywords', [])
                     amazon_data['Keywords'].append(', '.join(keywords) if isinstance(keywords, list) else str(keywords))
                     amazon_data['HSN Code'].append(version.get('hsnCode', ''))
-                
+
                 df = pd.DataFrame(amazon_data)
                 with pd.ExcelWriter(temp_file.name, engine='openpyxl') as writer:
                     df.to_excel(writer, index=False, sheet_name='Amazon Listings')
-                
+
             elif format == 'flipkart':
                 # Flipkart CSV format with multiple versions
                 flipkart_data = {
@@ -1433,14 +1430,14 @@ def export_listing(format):
                     'HSN': [],
                     'Keywords': []
                 }
-                
+
                 for version in listing_versions:
                     flipkart_data['Version'].append(version.get('version', 1))
                     flipkart_data['Style'].append(version.get('style', 'Standard'))
                     flipkart_data['Product Name'].append(version.get('title', ''))
                     flipkart_data['Product Description'].append(version.get('description', ''))
                     flipkart_data['Key Features'].append('; '.join(version.get('bulletPoints', [])))
-                    
+
                     # Handle missing pricing data gracefully
                     if pricing and pricing.get('flipkart'):
                         flipkart_data['MRP'].append(pricing.get('flipkart', {}).get('mrp', 0))
@@ -1448,15 +1445,15 @@ def export_listing(format):
                     else:
                         flipkart_data['MRP'].append(0)
                         flipkart_data['Selling Price'].append(0)
-                    
+
                     flipkart_data['Category'].append(version.get('category', ''))
                     flipkart_data['HSN'].append(version.get('hsnCode', ''))
                     keywords = version.get('keywords', [])
                     flipkart_data['Keywords'].append(', '.join(keywords) if isinstance(keywords, list) else str(keywords))
-                
+
                 df = pd.DataFrame(flipkart_data)
                 df.to_csv(temp_file.name, index=False, encoding='utf-8')
-                
+
             elif format == 'meesho':
                 # Meesho Excel format with multiple versions
                 meesho_data = {
@@ -1471,14 +1468,14 @@ def export_listing(format):
                     'HSN Code': [],
                     'Tags': []
                 }
-                
+
                 for version in listing_versions:
                     meesho_data['Version'].append(version.get('version', 1))
                     meesho_data['Style'].append(version.get('style', 'Standard'))
                     meesho_data['Product Title'].append(version.get('title', ''))
                     meesho_data['Product Description'].append(version.get('description', ''))
                     meesho_data['Features'].append('\n'.join(version.get('bulletPoints', [])))
-                    
+
                     # Handle missing pricing data gracefully
                     if pricing and pricing.get('meesho'):
                         meesho_data['MRP'].append(pricing.get('meesho', {}).get('mrp', 0))
@@ -1486,39 +1483,39 @@ def export_listing(format):
                     else:
                         meesho_data['MRP'].append(0)
                         meesho_data['Supplier Price'].append(0)
-                    
+
                     meesho_data['Category'].append(version.get('category', ''))
                     meesho_data['HSN Code'].append(version.get('hsnCode', ''))
                     keywords = version.get('keywords', [])
                     meesho_data['Tags'].append(', '.join(keywords) if isinstance(keywords, list) else str(keywords))
-                
+
                 df = pd.DataFrame(meesho_data)
                 with pd.ExcelWriter(temp_file.name, engine='openpyxl') as writer:
                     df.to_excel(writer, index=False, sheet_name='Meesho Listings')
-            
+
             print(f"File created successfully: {temp_file.name}")
-            
+
             # Verify file exists and has content
             if not os.path.exists(temp_file.name):
                 return jsonify({'error': 'Failed to create export file'}), 500
-            
+
             file_size = os.path.getsize(temp_file.name)
             if file_size == 0:
                 return jsonify({'error': 'Export file is empty'}), 500
-            
+
             print(f"File size: {file_size} bytes")
-            
+
             return send_file(temp_file.name, as_attachment=True, 
                             download_name=f'product_listing_{format}_versions_{datetime.now().strftime("%Y%m%d_%H%M%S")}.{file_extension}',
                             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' if file_extension == 'xlsx' else 'text/csv')
-        
+
         except Exception as export_error:
             print(f"Export error: {export_error}")
             # Clean up temp file on error
             if os.path.exists(temp_file.name):
                 os.unlink(temp_file.name)
             raise export_error
-        
+
     except Exception as e:
         print(f"General export error: {e}")
         import traceback
@@ -1530,12 +1527,12 @@ def validate_hsn():
     try:
         data = request.get_json()
         hsn_code = data.get('hsnCode', '')
-        
+
         if not hsn_code:
             return jsonify({'error': 'HSN code is required'}), 400
-        
+
         gst_rate, description, hsn_data = get_gst_rate_from_hsn_api(hsn_code)
-        
+
         response_data = {
             'success': True,
             'hsnCode': hsn_code,
@@ -1544,7 +1541,7 @@ def validate_hsn():
             'description': description,
             'isKnownHsn': hsn_code in HSN_GST_MAPPING
         }
-        
+
         # Add additional data if available from API
         if hsn_data:
             response_data.update({
@@ -1553,9 +1550,9 @@ def validate_hsn():
                 'productDescription': hsn_data.get('description'),
                 'source': hsn_data.get('source')
             })
-        
+
         return jsonify(response_data)
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1564,13 +1561,13 @@ def configure_gemini_api():
     try:
         data = request.get_json()
         api_key = data.get('apiKey')
-        
+
         if not api_key:
             return jsonify({'error': 'API key is required'}), 400
-        
+
         configure_gemini(api_key)
         return jsonify({'success': True, 'message': 'Gemini API configured successfully'})
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1579,12 +1576,12 @@ def scrape_product():
     try:
         data = request.get_json()
         url = data.get('url')
-        
+
         if not url:
             return jsonify({'error': 'URL is required'}), 400
-        
+
         product_data = scrape_product_data(url)
-        
+
         if product_data:
             # Calculate shipping for all marketplaces
             if product_data['weight'] or any(product_data['dimensions'].values()):
@@ -1594,11 +1591,11 @@ def scrape_product():
                     'all'
                 )
                 product_data['shipping'] = shipping_costs
-            
+
             return jsonify({'success': True, 'data': product_data})
         else:
             return jsonify({'error': 'Could not extract product data from URL'}), 400
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
