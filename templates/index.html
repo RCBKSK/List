@@ -346,32 +346,283 @@
                 }
             }, [productInfo.costPrice, productInfo.profitMargin, productInfo.platformCommission, productInfo.length, productInfo.width, productInfo.height]);
 
-             const generateProductImages = () => {
-                alert('Product Image Generator: AI-generated lifestyle images for products');
+             const generateProductImages = async () => {
+                if (!productInfo.name && !manualListing.title) {
+                    alert('Please enter product information first');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/generate-product-images', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            title: mode === 'ai' ? productInfo.name : manualListing.title,
+                            brand: productInfo.brand || 'Generic',
+                            category: mode === 'manual' ? manualListing.category : 'General'
+                        })
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        const data = result.data;
+                        let message = "🎨 AI Image Generation Prompts:\n\n";
+                        data.prompts.forEach((prompt, index) => {
+                            message += `${index + 1}. ${prompt}\n`;
+                        });
+                        message += "\n📐 Recommended Dimensions:\n";
+                        Object.entries(data.suggested_dimensions).forEach(([platform, dims]) => {
+                            message += `${platform}: ${dims.width}x${dims.height}px\n`;
+                        });
+                        alert(message);
+                    } else {
+                        alert('Error: ' + result.error);
+                    }
+                } catch (error) {
+                    alert('Error: ' + error.message);
+                }
             };
 
-            const calculateComprehensiveGst = () => {
-                alert('Tax Calculator: Complete GST filing helper with automated calculations');
+            const calculateComprehensiveGst = async () => {
+                if (!productInfo.costPrice) {
+                    alert('Please enter cost price first');
+                    return;
+                }
+
+                const hsnCode = mode === 'manual' ? manualListing.hsnCode : '9999';
+                
+                try {
+                    const response = await fetch('/api/calculate-comprehensive-gst', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            costPrice: parseFloat(productInfo.costPrice),
+                            hsnCode: hsnCode,
+                            stateFrom: 'Delhi',
+                            stateTo: 'Mumbai'
+                        })
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        const data = result.data;
+                        let message = `📊 Comprehensive GST Calculation:\n\n`;
+                        message += `Cost Price: ₹${data.costPrice}\n`;
+                        message += `HSN Code: ${data.hsnCode}\n`;
+                        message += `GST Rate: ${data.gstRate}%\n`;
+                        message += `GST Amount: ₹${data.gstAmount}\n`;
+                        message += `CGST: ₹${data.cgst}\n`;
+                        message += `SGST: ₹${data.sgst}\n`;
+                        message += `IGST: ₹${data.igst}\n`;
+                        message += `TCS: ₹${data.tcs}\n`;
+                        message += `Total Tax: ₹${data.totalTax}\n`;
+                        message += `Price with Tax: ₹${data.priceWithTax}\n`;
+                        message += `Tax Type: ${data.taxType}`;
+                        alert(message);
+                    } else {
+                        alert('Error: ' + result.error);
+                    }
+                } catch (error) {
+                    alert('Error: ' + error.message);
+                }
             };
 
-            const optimizeImages = () => {
-                 alert('Image Enhancement: Auto-crop, resize, and optimize images for each platform');
+            const optimizeImages = async () => {
+                try {
+                    const response = await fetch('/api/optimize-images', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            dimensions: { width: 1200, height: 1200 },
+                            platforms: ['amazon', 'flipkart', 'meesho']
+                        })
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        const data = result.data;
+                        let message = "🖼️ Image Optimization Guide:\n\n";
+                        Object.entries(data.platform_specs).forEach(([platform, spec]) => {
+                            message += `${platform.toUpperCase()}:\n`;
+                            message += `- Main: ${spec.main_image.width}x${spec.main_image.height} ${spec.main_image.format}\n`;
+                            message += `- Background: ${spec.background}\n`;
+                            message += `- Size limit: ${spec.file_size_limit}\n\n`;
+                        });
+                        message += "💡 Tips:\n";
+                        Object.entries(data.optimization_tips).forEach(([key, tip]) => {
+                            message += `- ${tip}\n`;
+                        });
+                        alert(message);
+                    } else {
+                        alert('Error: ' + result.error);
+                    }
+                } catch (error) {
+                    alert('Error: ' + error.message);
+                }
             };
 
-            const createAbTest = () => {
-                alert('A/B Testing Generator: Create variations for title/description testing');
+            const createAbTest = async () => {
+                let title, description, bullets;
+                
+                if (mode === 'ai' && generatedListing) {
+                    const amazonListing = generatedListing.amazon?.[0];
+                    if (amazonListing) {
+                        title = amazonListing.title;
+                        description = amazonListing.description;
+                        bullets = amazonListing.bulletPoints;
+                    }
+                } else if (mode === 'manual') {
+                    title = manualListing.title;
+                    description = manualListing.description;
+                    bullets = manualListing.bulletPoints;
+                }
+
+                if (!title) {
+                    alert('Please generate or enter listing data first');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/create-ab-test', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title, description, bulletPoints: bullets })
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        const data = result.data;
+                        let message = "🧪 A/B Test Variations:\n\n";
+                        message += "📝 Title Variations:\n";
+                        data.title_variations.forEach((variation, index) => {
+                            message += `${index + 1}. ${variation}\n`;
+                        });
+                        message += "\n📖 Description Variations:\n";
+                        data.description_variations.slice(0, 3).forEach((variation, index) => {
+                            message += `${index + 1}. ${variation}\n`;
+                        });
+                        message += `\n📊 Test Duration: ${data.test_duration_recommendation}`;
+                        alert(message);
+                    } else {
+                        alert('Error: ' + result.error);
+                    }
+                } catch (error) {
+                    alert('Error: ' + error.message);
+                }
             };
 
-            const analyzeReviews = () => {
-                 alert('Review Sentiment Analysis: Analyze competitor reviews to identify improvement opportunities');
+            const analyzeReviews = async () => {
+                try {
+                    const response = await fetch('/api/analyze-reviews', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ reviews: [] }) // Sample data
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        const data = result.data;
+                        let message = "💬 Review Sentiment Analysis:\n\n";
+                        message += `📊 Sentiment Score: ${(data.sentiment_score * 100).toFixed(1)}%\n`;
+                        message += `✅ Positive: ${data.positive_percentage}%\n`;
+                        message += `❌ Negative: ${data.negative_percentage}%\n\n`;
+                        message += "🚀 Improvement Opportunities:\n";
+                        data.improvement_opportunities.slice(0, 3).forEach((opp, index) => {
+                            message += `${index + 1}. ${opp}\n`;
+                        });
+                        message += "\n💡 Positive Highlights:\n";
+                        data.positive_highlights.slice(0, 3).forEach((highlight, index) => {
+                            message += `${index + 1}. ${highlight}\n`;
+                        });
+                        alert(message);
+                    } else {
+                        alert('Error: ' + result.error);
+                    }
+                } catch (error) {
+                    alert('Error: ' + error.message);
+                }
             };
 
-            const trackKeywords = () => {
-                alert('Keyword Ranking Tracker: Track how your product keywords perform on different platforms');
+            const trackKeywords = async () => {
+                let keywords = [];
+                
+                if (mode === 'ai' && generatedListing) {
+                    const amazonListing = generatedListing.amazon?.[0];
+                    if (amazonListing) {
+                        keywords = Array.isArray(amazonListing.keywords) ? amazonListing.keywords : [];
+                    }
+                } else if (mode === 'manual') {
+                    keywords = Array.isArray(manualListing.keywords) ? manualListing.keywords : [];
+                }
+
+                if (keywords.length === 0) {
+                    keywords = ['product', 'quality', 'durable']; // Default keywords
+                }
+
+                try {
+                    const response = await fetch('/api/track-keywords', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ keywords: keywords.slice(0, 5) })
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        const data = result.data;
+                        let message = "📈 Keyword Ranking Analysis:\n\n";
+                        Object.entries(data.rankings).forEach(([platform, platformData]) => {
+                            message += `${platform.toUpperCase()}:\n`;
+                            Object.entries(platformData).slice(0, 3).forEach(([keyword, rankData]) => {
+                                message += `- ${keyword}: Rank ${rankData.current_rank} (Vol: ${rankData.search_volume})\n`;
+                            });
+                            message += "\n";
+                        });
+                        message += "💡 Recommendations:\n";
+                        data.recommendations.slice(0, 3).forEach((rec, index) => {
+                            message += `${index + 1}. ${rec}\n`;
+                        });
+                        alert(message);
+                    } else {
+                        alert('Error: ' + result.error);
+                    }
+                } catch (error) {
+                    alert('Error: ' + error.message);
+                }
             };
 
-            const analyzeMarketTrends = () => {
-               alert('Market Trend Analysis: Show trending keywords and categories based on search volume');
+            const analyzeMarketTrends = async () => {
+                const category = mode === 'manual' ? manualListing.category || 'General' : 'General';
+                
+                try {
+                    const response = await fetch('/api/market-trends', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ category })
+                    });
+
+                    const result = await response.json();
+                    if (result.success) {
+                        const data = result.data;
+                        let message = "📊 Market Trend Analysis:\n\n";
+                        message += "🔥 Trending Keywords:\n";
+                        data.trending_keywords.slice(0, 5).forEach((trend, index) => {
+                            message += `${index + 1}. ${trend.keyword} (${trend.growth}, Vol: ${trend.volume})\n`;
+                        });
+                        message += "\n🚀 Fastest Growing Categories:\n";
+                        data.category_insights.fastest_growing_subcategories.slice(0, 3).forEach((cat, index) => {
+                            message += `${index + 1}. ${cat}\n`;
+                        });
+                        message += "\n💡 Emerging Trends:\n";
+                        data.category_insights.emerging_trends.slice(0, 3).forEach((trend, index) => {
+                            message += `${index + 1}. ${trend}\n`;
+                        });
+                        alert(message);
+                    } else {
+                        alert('Error: ' + result.error);
+                    }
+                } catch (error) {
+                    alert('Error: ' + error.message);
+                }
             };
 
             return (
