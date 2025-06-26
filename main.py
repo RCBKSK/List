@@ -940,6 +940,153 @@ def generate_listing():
                     "category": "Suggested category",
                     "hsnCode": "HSN code preferably from 5% GST slab",
                     "keywords": ["regional SEO keywords"]
+                }}
+            ]
+        }}
+
+        Make each version unique with different copywriting approaches, target different customer personas, and use varied language styles suitable for Indian customers.
+
+        """
+
+        # Generate content with Gemini Vision
+        try:
+            print("Calling Gemini API...")
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            response = model.generate_content([prompt, image])
+            print("Gemini API call successful")
+        except Exception as api_error:
+            print(f"Gemini API error: {api_error}")
+            return jsonify({'error': f'Gemini API call failed: {str(api_error)}'}), 500
+
+        # Parse the response
+        try:
+            print("Parsing Gemini response...")
+            # Extract JSON from response
+            response_text = response.text
+            print(f"Raw response: {response_text[:200]}...")
+
+            if '```json' in response_text:
+                json_start = response_text.find('```json') + 7
+                json_end = response_text.find('```', json_start)
+                response_text = response_text[json_start:json_end]
+            elif '{' in response_text and '}' in response_text:
+                json_start = response_text.find('{')
+                json_end = response_text.rfind('}') + 1
+                response_text = response_text[json_start:json_end]
+
+            listing_data = json.loads(response_text)
+            print("JSON parsing successful")
+        except Exception as parse_error:
+            print(f"JSON parsing error: {parse_error}")
+            # Fallback if JSON parsing fails
+            listing_data = {
+                "amazon": [
+                    {
+                        "version": 1,
+                        "style": "Professional",
+                        "title": f"{brand} {product_name} - Premium Quality".strip() or "Premium Quality Product",
+                        "bulletPoints": ["High quality product", "Suitable for daily use", "Durable and long-lasting"],
+                        "description": "Quality product with excellent features and reliable performance for everyday use.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["quality", "durable", "reliable"]
+                    },
+                    {
+                        "version": 2,
+                        "style": "Value-focused",
+                        "title": f"{brand} {product_name} - Best Value".strip() or "Best Value Product",
+                        "bulletPoints": ["Excellent value for money", "Cost-effective solution", "Great performance"],
+                        "description": "Get the best value with this cost-effective product that delivers great performance.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["value", "affordable", "performance"]
+                    },
+                    {
+                        "version": 3,
+                        "style": "Lifestyle",
+                        "title": f"{brand} {product_name} - Lifestyle Choice".strip() or "Lifestyle Product",
+                        "bulletPoints": ["Perfect for modern lifestyle", "Stylish and functional", "Enhances daily routine"],
+                        "description": "Upgrade your lifestyle with this stylish and functional product for modern living.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["lifestyle", "modern", "stylish"]
+                    }
+                ],
+                "flipkart": [
+                    {
+                        "version": 1,
+                        "style": "Technical",
+                        "title": f"{brand} {product_name} - Advanced Features".strip() or "Advanced Feature Product",
+                        "bulletPoints": ["Advanced technology", "Superior specifications", "Technical excellence"],
+                        "description": "Experience advanced technology with superior specifications and technical excellence.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["advanced", "technology", "specifications"]
+                    },
+                    {
+                        "version": 2,
+                        "style": "Comparison",
+                        "title": f"{brand} {product_name} - Superior Choice".strip() or "Superior Choice Product",
+                        "bulletPoints": ["Better than competitors", "Proven superiority", "Top-rated choice"],
+                        "description": "Choose the superior option that outperforms competitors with proven quality.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["superior", "better", "top-rated"]
+                    },
+                    {
+                        "version": 3,
+                        "style": "Trendy",
+                        "title": f"{brand} {product_name} - Trending Now".strip() or "Trending Product",
+                        "bulletPoints": ["Latest trend", "Popular choice", "Modern design"],
+                        "description": "Stay on-trend with this popular choice featuring modern design and latest features.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["trending", "popular", "modern"]
+                    }
+                ],
+                "meesho": [
+                    {
+                        "version": 1,
+                        "style": "Budget",
+                        "title": f"{brand} {product_name} - Affordable Quality".strip() or "Affordable Quality Product",
+                        "bulletPoints": ["Budget-friendly price", "Great savings", "Affordable excellence"],
+                        "description": "Get quality at an affordable price with great savings and excellent value.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["affordable", "budget", "savings"]
+                    },
+                    {
+                        "version": 2,
+                        "style": "Family",
+                        "title": f"{brand} {product_name} - Family Choice".strip() or "Family Choice Product",
+                        "bulletPoints": ["Perfect for families", "Safe and reliable", "Family-friendly design"],
+                        "description": "The perfect family choice with safe, reliable design for all family members.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["family", "safe", "reliable"]
+                    },
+                    {
+                        "version": 3,
+                        "style": "Regional",
+                        "title": f"{brand} {product_name} - Local Favorite".strip() or "Local Favorite Product",
+                        "bulletPoints": ["Locally popular", "Regional favorite", "Community choice"],
+                        "description": "Join the community choice with this locally popular and regionally favored product.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["local", "community", "popular"]
+                    }
+                ]
+            }
+            print("Using fallback listing data")
+
+        print("Returning successful response")
+        return jsonify({'success': True, 'data': listing_data})
+
+    except Exception as e:
+        print(f"Unexpected error in generate_listing: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 def analyze_market_prices(product_name, category):
     """Analyze market prices for similar products"""
@@ -984,16 +1131,6 @@ def analyze_market():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-                }}
-            ]
-        }}
-
-        Make each version unique with different copywriting approaches, target different customer personas, and use varied language styles suitable for Indian customers.
-
-        """
-
-        # Generate content with Gemini Vision
 
 def analyze_seo_score(title, description, keywords, category):
     """Calculate SEO score for product listing"""
@@ -1139,145 +1276,6 @@ def export_custom():
                         download_name=f'custom_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.{format_type}')
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-        try:
-            print("Calling Gemini API...")
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            response = model.generate_content([prompt, image])
-            print("Gemini API call successful")
-        except Exception as api_error:
-            print(f"Gemini API error: {api_error}")
-            return jsonify({'error': f'Gemini API call failed: {str(api_error)}'}), 500
-
-        # Parse the response
-        try:
-            print("Parsing Gemini response...")
-            # Extract JSON from response
-            response_text = response.text
-            print(f"Raw response: {response_text[:200]}...")
-
-            if '```json' in response_text:
-                json_start = response_text.find('```json') + 7
-                json_end = response_text.find('```', json_start)
-                response_text = response_text[json_start:json_end]
-            elif '{' in response_text and '}' in response_text:
-                json_start = response_text.find('{')
-                json_end = response_text.rfind('}') + 1
-                response_text = response_text[json_start:json_end]
-
-            listing_data = json.loads(response_text)
-            print("JSON parsing successful")
-        except Exception as parse_error:
-            print(f"JSON parsing error: {parse_error}")
-            # Fallback if JSON parsing fails
-            listing_data = {
-                "amazon": [
-                    {
-                        "version": 1,
-                        "style": "Professional",
-                        "title": f"{brand} {product_name} - Premium Quality".strip() or "Premium Quality Product",
-                        "bulletPoints": ["High quality product", "Suitable for daily use", "Durable and long-lasting"],
-                        "description": "Quality product with excellent features and reliable performance for everyday use.",
-                        "category": "General",
-                        "hsnCode": "9999",
-                        "keywords": ["quality", "durable", "reliable"]
-                    },
-                    {
-                        "version": 2,
-                        "style": "Value-focused",
-                        "title": f"{brand} {product_name} - Best Value".strip() or "Best Value Product",
-                        "bulletPoints": ["Excellent value for money", "Cost-effective solution", "Great performance"],
-                        "description": "Get the best value with this cost-effective product that delivers great performance.",
-                        "category": "General",
-                        "hsnCode": "9999",
-                        "keywords": ["value", "affordable", "performance"]
-                    },
-                    {
-                        "version": 3,
-                        "style": "Lifestyle",
-                        "title": f"{brand} {product_name} - Lifestyle Choice".strip() or "Lifestyle Product",
-                        "bulletPoints": ["Perfect for modern lifestyle", "Stylish and functional", "Enhances daily routine"],
-                        "description": "Upgrade your lifestyle with this stylish and functional product for modern living.",
-                        "category": "General",
-                        "hsnCode": "9999",
-                        "keywords": ["lifestyle", "modern", "stylish"]
-                    }
-                ],
-                "flipkart": [
-                    {
-                        "version": 1,
-                        "style": "Technical",
-                        "title": f"{brand} {product_name} - Advanced Features".strip() or "Advanced Feature Product",
-                        "bulletPoints": ["Advanced technology", "Superior specifications", "Technical excellence"],
-                        "description": "Experience advanced technology with superior specifications and technical excellence.",
-                        "category": "General",
-                        "hsnCode": "9999",
-                        "keywords": ["advanced", "technology", "specifications"]
-                    },
-                    {
-                        "version": 2,
-                        "style": "Comparison",
-                        "title": f"{brand} {product_name} - Superior Choice".strip() or "Superior Choice Product",
-                        "bulletPoints": ["Better than competitors", "Proven superiority", "Top-rated choice"],
-                        "description": "Choose the superior option that outperforms competitors with proven quality.",
-                        "category": "General",
-                        "hsnCode": "9999",
-                        "keywords": ["superior", "better", "top-rated"]
-                    },
-                    {
-                        "version": 3,
-                        "style": "Trendy",
-                        "title": f"{brand} {product_name} - Trending Now".strip() or "Trending Product",
-                        "bulletPoints": ["Latest trend", "Popular choice", "Modern design"],
-                        "description": "Stay on-trend with this popular choice featuring modern design and latest features.",
-                        "category": "General",
-                        "hsnCode": "9999",
-                        "keywords": ["trending", "popular", "modern"]
-                    }
-                ],
-                "meesho": [
-                    {
-                        "version": 1,
-                        "style": "Budget",
-                        "title": f"{brand} {product_name} - Affordable Quality".strip() or "Affordable Quality Product",
-                        "bulletPoints": ["Budget-friendly price", "Great savings", "Affordable excellence"],
-                        "description": "Get quality at an affordable price with great savings and excellent value.",
-                        "category": "General",
-                        "hsnCode": "9999",
-                        "keywords": ["affordable", "budget", "savings"]
-                    },
-                    {
-                        "version": 2,
-                        "style": "Family",
-                        "title": f"{brand} {product_name} - Family Choice".strip() or "Family Choice Product",
-                        "bulletPoints": ["Perfect for families", "Safe and reliable", "Family-friendly design"],
-                        "description": "The perfect family choice with safe, reliable design for all family members.",
-                        "category": "General",
-                        "hsnCode": "9999",
-                        "keywords": ["family", "safe", "reliable"]
-                    },
-                    {
-                        "version": 3,
-                        "style": "Regional",
-                        "title": f"{brand} {product_name} - Local Favorite".strip() or "Local Favorite Product",
-                        "bulletPoints": ["Locally popular", "Regional favorite", "Community choice"],
-                        "description": "Join the community choice with this locally popular and regionally favored product.",
-                        "category": "General",
-                        "hsnCode": "9999",
-                        "keywords": ["local", "community", "popular"]
-                    }
-                ]
-            }
-            print("Using fallback listing data")
-
-        print("Returning successful response")
-        return jsonify({'success': True, 'data': listing_data})
-
-    except Exception as e:
-        print(f"Unexpected error in generate_listing: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/calculate-price', methods=['POST'])
