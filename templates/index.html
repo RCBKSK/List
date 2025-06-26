@@ -297,7 +297,12 @@
 
                     const data = await response.json();
                     if (data.success) {
-                        setPriceBreakdown(data.data);
+                        // In AI mode, use Amazon pricing as default, in manual mode use the full data structure
+                        if (mode === 'ai') {
+                            setPriceBreakdown(data.data.amazon || data.data);
+                        } else {
+                            setPriceBreakdown(data.data);
+                        }
                     } else {
                         alert('Error calculating pricing: ' + data.error);
                     }
@@ -952,7 +957,7 @@
                             {/* Price Breakdown */}
                             {priceBreakdown && (
                                 <div className="glass-effect p-6">
-                                    <h3 className="text-xl font-semibold text-white mb-4">💰 Price Breakdown</h3>
+                                    <h3 className="text-xl font-semibold text-white mb-4">💰 Price Breakdown {mode === 'ai' ? '(Amazon)' : ''}</h3>
                                     <div className="space-y-2 text-white">
                                         <div className="flex justify-between">
                                             <span>Cost Price:</span>
@@ -963,7 +968,7 @@
                                             <span>₹{priceBreakdown.gst || '0'}</span>
                                         </div>
                                         {priceBreakdown.gstDescription && (
-                                            <div className="text-xs text-gray-600 italic">
+                                            <div className="text-xs text-gray-300 italic">
                                                 {priceBreakdown.gstDescription}
                                             </div>
                                         )}
