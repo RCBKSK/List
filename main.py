@@ -1,89 +1,46 @@
-from flask import Flask, request, jsonify, render_template, send_file
+from flask import Flask, render_template, request, jsonify, send_file
 from flask_cors import CORS
 import google.generativeai as genai
-from PIL import Image
-import io
-import base64
 import json
+import base64
+import io
 import pandas as pd
-import os
-from datetime import datetime
-import tempfile
+import openpyxl
+from PIL import Image
 import requests
 from bs4 import BeautifulSoup
-import re
-from urllib.parse import urlparse
 import time
+from datetime import datetime
+import os
+import re
 import functools
 from collections import defaultdict
+from urllib.parse import urlparse
+import tempfile
 
 app = Flask(__name__)
 CORS(app)
 
-# Configure Gemini AI (will be set by user input)
-genai_api_key = None
+# Global variables
+gemini_model = None
+saved_templates = {}
 
-# HSN Code to GST Rate mapping (sample data - can be expanded)
+# HSN Code to GST mapping
 HSN_GST_MAPPING = {
-    # Food items (0% - 5%)
-    "0101": 0.0,   # Live horses, asses, mules and hinnies
-    "0102": 0.0,   # Live bovine animals
-    "0701": 0.0,   # Potatoes, fresh or chilled
-    "0702": 0.0,   # Tomatoes, fresh or chilled
-    "1001": 0.0,   # Wheat and meslin
-    "1006": 0.0,   # Rice
-    "1701": 0.05,  # Cane or beet sugar
-
-    # Textiles (5% - 12%)
-    "5201": 0.05,  # Cotton, not carded or combed
-    "5208": 0.05,  # Woven fabrics of cotton
-    "6101": 0.12,  # Men's or boys' overcoats
-    "6201": 0.12,  # Women's or girls' overcoats
-    "6301": 0.05,  # Blankets and travelling rugs
-    "6302": 0.05,  # Bed linen, table linen
-
-    # Electronics (18% - 28%)
-    "8471": 0.18,  # Automatic data processing machines
-    "8517": 0.18,  # Telephone sets, mobile phones
-    "8528": 0.18,  # Monitors and projectors
-    "8544": 0.18,  # Insulated wire, cable
-    "9013": 0.18,  # Liquid crystal devices
-
-    # Automobiles (28%)
-    "8703": 0.28,  # Motor cars and other motor vehicles
-    "8704": 0.28,  # Motor vehicles for transport of goods
-    "8711": 0.28,  # Motorcycles
-
-    # Chemicals (5% - 18%)
-    "2501": 0.05,  # Salt
-    "2804": 0.05,  # Hydrogen, rare gases
-    "3004": 0.12,  # Medicaments
-    "3303": 0.18,  # Perfumes and toilet waters
-    "3401": 0.18,  # Soap
-
-    # Books and stationery (0% - 12%)
-    "4901": 0.0,   # Printed books, brochures
-    "4902": 0.0,   # Newspapers, journals
-    "4910": 0.05,  # Calendars of any kind
-    "4911": 0.12,  # Other printed matter
-
-    # Common HSN codes for various products
-    "3926": 0.18,  # Other articles of plastics
-    "4202": 0.18,  # Trunks, suit-cases, handbags
-    "6403": 0.18,  # Footwear with outer soles of rubber
-    "7013": 0.18,  # Glassware of a kind used for table
-    "7323": 0.18,  # Table, kitchen or other household articles
-    "8302": 0.18,  # Base metal mountings, fittings
-    "8443": 0.18,  # Printing machinery
-    "9403": 0.12,  # Other furniture and parts thereof
-    "9404": 0.12,  # Mattress supports; articles of bedding
-    "9405": 0.12,  # Lamps and lighting fittings
-    "9503": 0.12,  # Tricycles, scooters, pedal cars (toys)
-    "9504": 0.28,  # Video game consoles and machines
-    "9505": 0.12,  # Festive, carnival or other entertainment articles
-
-    # Default/Unknown HSN codes
-    "9999": 0.18,  # Default rate for unknown items
+    '8517': {'rate': 18, 'description': 'Telephone sets, telephones'},
+    '9013': {'rate': 18, 'description': 'Liquid crystal devices'},
+    '8471': {'rate': 18, 'description': 'Automatic data processing machines'},
+    '6204': {'rate': 12, 'description': 'Women\'s suits, ensembles'},
+    '6203': {'rate': 12, 'description': 'Men\'s suits, ensembles'},
+    '6401': {'rate': 5, 'description': 'Waterproof footwear'},
+    '6402': {'rate': 5, 'description': 'Other footwear'},
+    '7323': {'rate': 18, 'description': 'Table, kitchen or other household articles'},
+    '9404': {'rate': 18, 'description': 'Mattress supports; articles of bedding'},
+    '6302': {'rate': 5, 'description': 'Bed linen, table linen, toilet linen'},
+    '3304': {'rate': 18, 'description': 'Beauty or make-up preparations'},
+    '3401': {'rate': 18, 'description': 'Soap; organic surface-active products'},
+    '8414': {'rate': 18, 'description': 'Air or vacuum pumps, air compressors'},
+    '8516': {'rate': 18, 'description': 'Electric instantaneous or storage water heaters'}
 }
 
 # Performance monitoring
@@ -222,41 +179,13 @@ def get_gst_rate_from_hsn_local(hsn_code):
 
     # Try exact match first
     if hsn_clean in HSN_GST_MAPPING:
-        rate = HSN_GST_MAPPING[hsn_clean]
+        rate = HSN_GST_MAPPING[hsn_clean]['rate']
         return rate, f"HSN {hsn_clean}: {rate * 100}% GST (Local)", {
             'hsnCode': hsn_clean,
             'gstRate': rate * 100,
             'description': 'Local mapping',
             'source': 'Local Database'
         }
-
-    # Try partial match for 4-digit HSN codes (match first 4 digits)
-    if len(hsn_clean) >= 4:
-        hsn_4digit = hsn_clean[:4]
-        if hsn_4digit in HSN_GST_MAPPING:
-            rate = HSN_GST_MAPPING[hsn_4digit]
-            return rate, f"HSN {hsn_4digit}: {rate * 100}% GST (matched from {hsn_clean})", {
-                'hsnCode': hsn_4digit,
-                'gstRate': rate * 100,
-                'description': f'Matched from {hsn_clean}',
-                'source': 'Local Database'
-            }
-
-    # Try partial match for 2-digit HSN codes (match first 2 digits)
-    if len(hsn_clean) >= 2:
-        hsn_2digit = hsn_clean[:2]
-        # Find similar HSN codes with same first 2 digits
-        similar_hsns = [hsn for hsn in HSN_GST_MAPPING.keys() if hsn.startswith(hsn_2digit)]
-        if similar_hsns:
-            # Use the most common rate for this category
-            rates = [HSN_GST_MAPPING[hsn] for hsn in similar_hsns]
-            common_rate = max(set(rates), key=rates.count)  # Most frequent rate
-            return common_rate, f"Category {hsn_2digit}: {common_rate * 100}% GST (estimated from {hsn_clean})", {
-                'hsnCode': hsn_2digit,
-                'gstRate': common_rate * 100,
-                'description': f'Category estimate from {hsn_clean}',
-                'source': 'Local Database'
-            }
 
     # Default to 18% if no match found
     return 0.18, f"HSN {hsn_clean}: 18% GST (default rate - unknown HSN)", {
@@ -274,10 +203,383 @@ def get_gst_rate_from_hsn(hsn_code):
     gst_rate, description, hsn_data = get_gst_rate_from_hsn_api(hsn_code)
     return gst_rate, description
 
-def configure_gemini(api_key):
-    global genai_api_key
-    genai_api_key = api_key
-    genai.configure(api_key=api_key)
+def configure_gemini_api(api_key):
+    global gemini_model
+    try:
+        genai.configure(api_key=api_key)
+        gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+        return True
+    except Exception as e:
+        print(f"Error configuring Gemini API: {e}")
+        return False
+
+def analyze_image_with_gemini(image_data, product_info):
+    global gemini_model
+    if not gemini_model:
+        raise Exception("Gemini API not configured")
+
+    try:
+        # Convert base64 to PIL Image
+        image_data = image_data.split(',')[1] if ',' in image_data else image_data
+        image_bytes = base64.b64decode(image_data)
+        image = Image.open(io.BytesIO(image_bytes))
+
+        prompt = f"""
+        Analyze this product image and generate e-commerce listings for Amazon, Flipkart, and Meesho.
+
+        Product Information:
+        - Name: {product_info.get('name', 'Not provided')}
+        - Brand: {product_info.get('brand', 'Not provided')}
+        - Weight: {product_info.get('weight', 'Not provided')} kg
+        - Dimensions: {product_info.get('length', 'Not provided')}x{product_info.get('width', 'Not provided')}x{product_info.get('height', 'Not provided')} cm
+
+        Create listings optimized for each platform with appropriate titles, descriptions, bullet points, categories, and keywords.
+        Return the response in this exact JSON format:
+
+        {{
+            "amazon": [
+                {{
+                    "version": 1,
+                    "style": "Feature-rich",
+                    "title": "Amazon-optimized title under 200 characters",
+                    "bulletPoints": ["5 feature-focused bullet points under 250 chars each"],
+                    "description": "Detailed 50-75 words description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["comma-separated SEO keywords"]
+                }},
+                {{
+                    "version": 2,
+                    "style": "Problem-solving",
+                    "title": "Problem-solving title under 200 characters",
+                    "bulletPoints": ["5 solution-focused bullet points under 250 chars each"],
+                    "description": "Solution-focused 50-75 words description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["solution-focused SEO keywords"]
+                }},
+                {{
+                    "version": 3,
+                    "style": "Premium & Luxury",
+                    "title": "Premium title under 200 characters",
+                    "bulletPoints": ["5 premium bullet points under 250 chars each"],
+                    "description": "Premium 50-75 words description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["premium SEO keywords"]
+                }}
+            ],
+            "flipkart": [
+                {{
+                    "version": 1,
+                    "style": "Specification-heavy",
+                    "title": "Flipkart-optimized title under 200 characters",
+                    "bulletPoints": ["3-5 spec-focused bullet points under 250 chars each"],
+                    "description": "Technical 50-75 words description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["technical SEO keywords"]
+                }},
+                {{
+                    "version": 2,
+                    "style": "Comparison & USP-focused",
+                    "title": "Comparison-based title under 200 characters",
+                    "bulletPoints": ["3-5 comparison bullet points under 250 chars each"],
+                    "description": "USP-focused 50-75 words description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["comparison SEO keywords"]
+                }},
+                {{
+                    "version": 3,
+                    "style": "Trendy & Modern",
+                    "title": "Trendy title under 200 characters",
+                    "bulletPoints": ["3-5 modern lifestyle bullet points under 250 chars each"],
+                    "description": "Modern 50-75 words description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["trendy SEO keywords"]
+                }}
+            ],
+            "meesho": [
+                {{
+                    "version": 1,
+                    "style": "Budget-conscious",
+                    "title": "Value-focused title under 200 characters",
+                    "bulletPoints": ["3-5 value-focused bullet points under 250 chars each"],
+                    "description": "Budget-friendly 50-75 words description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["budget SEO keywords"]
+                }},
+                {{
+                    "version": 2,
+                    "style": "Family-oriented",
+                    "title": "Family-friendly title under 200 characters",
+                    "bulletPoints": ["3-5 family-focused bullet points under 250 chars each"],
+                    "description": "Family-oriented 50-75 words description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["family SEO keywords"]
+                }},
+                {{
+                    "version": 3,
+                    "style": "Social & Shareable",
+                    "title": "Social-media friendly title under 200 characters",
+                    "bulletPoints": ["3-5 shareable bullet points under 250 chars each"],
+                    "description": "Social-friendly 50-75 words description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["social SEO keywords"]
+                }}
+            ]
+        }}
+        """
+
+        response = gemini_model.generate_content([prompt, image])
+
+        # Clean the response and extract JSON
+        response_text = response.text.strip()
+        if response_text.startswith('```json'):
+            response_text = response_text[7:]
+        if response_text.endswith('```'):
+            response_text = response_text[:-3]
+
+        return json.loads(response_text)
+
+    except Exception as e:
+        print(f"Error analyzing image: {e}")
+        raise e
+
+def calculate_shipping_cost(weight, length, width, height):
+    volume = (length * width * height) / 5000  # Volumetric weight in kg
+    chargeable_weight = max(weight, volume)
+
+    if chargeable_weight <= 0.5:
+        return 40
+    elif chargeable_weight <= 1:
+        return 60
+    elif chargeable_weight <= 2:
+        return 80
+    else:
+        return 80 + (chargeable_weight - 2) * 20
+
+def get_gst_info(hsn_code):
+    return HSN_GST_MAPPING.get(hsn_code, {'rate': 18, 'description': 'Other goods'})
+
+def calculate_marketplace_pricing(cost_price, profit_margin, hsn_code, weight, length, width, height):
+    gst_info = get_gst_info(hsn_code)
+    gst_rate = gst_info['rate']
+
+    shipping_cost = calculate_shipping_cost(weight, length, width, height)
+
+    # Platform commission rates
+    commission_rates = {
+        'amazon': 15,  # 15% commission
+        'flipkart': 12,  # 12% commission
+        'meesho': 8    # 8% commission
+    }
+
+    pricing = {}
+
+    for marketplace, commission_rate in commission_rates.items():
+        # Calculate target profit
+        target_profit = cost_price * (profit_margin / 100)
+
+        # Calculate selling price before commission
+        base_price = cost_price + target_profit + shipping_cost
+
+        # Calculate platform commission
+        platform_commission = base_price * (commission_rate / 100)
+
+        # Calculate final selling price
+        selling_price = base_price + platform_commission
+
+        # Calculate GST
+        gst = selling_price * (gst_rate / 100)
+
+        # Calculate MRP (20% above selling price)
+        mrp = selling_price * 1.2
+
+        pricing[marketplace] = {
+            'costPrice': round(cost_price, 2),
+            'targetProfit': round(target_profit, 2),
+            'shippingCost': round(shipping_cost, 2),
+            'platformCommission': round(platform_commission, 2),
+            'platformCommissionRate': f"{commission_rate}%",
+            'gst': round(gst, 2),
+            'gstRate': f"{gst_rate}%",
+            'gstDescription': gst_info['description'],
+            'sellingPrice': round(selling_price, 2),
+            'mrp': round(mrp, 2),
+            'hsnCode': hsn_code
+        }
+
+    return pricing
+
+def scrape_product_info(url):
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+
+        response = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        product_data = {
+            'title': '',
+            'brand': '',
+            'weight': '',
+            'dimensions': {'length': '', 'width': '', 'height': ''}
+        }
+
+        # Amazon scraping
+        if 'amazon' in url:
+            title_elem = soup.find('span', {'id': 'productTitle'})
+            if title_elem:
+                product_data['title'] = title_elem.text.strip()
+
+            # Try to find brand
+            brand_elem = soup.find('tr', {'class': 'a-spacing-small'})
+            if brand_elem:
+                brand_text = brand_elem.find('td')
+                if brand_text:
+                    product_data['brand'] = brand_text.text.strip()
+
+        # Flipkart scraping
+        elif 'flipkart' in url:
+            title_elem = soup.find('span', {'class': 'B_NuCI'})
+            if title_elem:
+                product_data['title'] = title_elem.text.strip()
+
+        return product_data
+
+    except Exception as e:
+        print(f"Error scraping product: {e}")
+        return None
+
+def create_export_file(listings, pricing, format_type):
+    if format_type == 'amazon':
+        return create_amazon_excel(listings, pricing)
+    elif format_type == 'flipkart':
+        return create_flipkart_csv(listings, pricing)
+    elif format_type == 'meesho':
+        return create_meesho_excel(listings, pricing)
+
+def create_amazon_excel(listings, pricing):
+    df = pd.DataFrame()
+
+    for listing in listings:
+        row = {
+            'Product Title': listing['title'],
+            'Product Description': listing['description'],
+            'Bullet Point 1': listing['bulletPoints'][0] if len(listing['bulletPoints']) > 0 else '',
+            'Bullet Point 2': listing['bulletPoints'][1] if len(listing['bulletPoints']) > 1 else '',
+            'Bullet Point 3': listing['bulletPoints'][2] if len(listing['bulletPoints']) > 2 else '',
+            'Bullet Point 4': listing['bulletPoints'][3] if len(listing['bulletPoints']) > 3 else '',
+            'Bullet Point 5': listing['bulletPoints'][4] if len(listing['bulletPoints']) > 4 else '',
+            'Keywords': ', '.join(listing['keywords']) if isinstance(listing['keywords'], list) else listing['keywords'],
+            'Category': listing['category'],
+            'HSN Code': listing['hsnCode'],
+            'MRP': pricing.get('amazon', {}).get('mrp', ''),
+            'Selling Price': pricing.get('amazon', {}).get('sellingPrice', ''),
+            'Version': listing.get('version', 1),
+            'Style': listing.get('style', 'Standard')
+        }
+        df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+
+    output = io.BytesIO()
+    df.to_excel(output, index=False, engine='openpyxl')
+    output.seek(0)
+    return output
+
+def create_flipkart_csv(listings, pricing):
+    df = pd.DataFrame()
+
+    for listing in listings:
+        row = {
+            'Product Name': listing['title'],
+            'Product Description': listing['description'],
+            'Key Features': '\n'.join(listing['bulletPoints']),
+            'Keywords': ', '.join(listing['keywords']) if isinstance(listing['keywords'], list) else listing['keywords'],
+            'Category': listing['category'],
+            'HSN Code': listing['hsnCode'],
+            'MRP': pricing.get('flipkart', {}).get('mrp', ''),
+            'Selling Price': pricing.get('flipkart', {}).get('sellingPrice', ''),
+            'Version': listing.get('version', 1),
+            'Style': listing.get('style', 'Standard')
+        }
+        df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+
+    output = io.StringIO()
+    df.to_csv(output, index=False)
+    return output
+
+def create_meesho_excel(listings, pricing):
+    df = pd.DataFrame()
+
+    for listing in listings:
+        row = {
+            'Product Title': listing['title'],
+            'Product Description': listing['description'],
+            'Key Features': '\n'.join(listing['bulletPoints']),
+            'Search Keywords': ', '.join(listing['keywords']) if isinstance(listing['keywords'], list) else listing['keywords'],
+            'Category': listing['category'],
+            'HSN Code': listing['hsnCode'],
+            'MRP': pricing.get('meesho', {}).get('mrp', ''),
+            'Selling Price': pricing.get('meesho', {}).get('sellingPrice', ''),
+            'Version': listing.get('version', 1),
+            'Style': listing.get('style', 'Standard')
+        }
+        df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+
+    output = io.BytesIO()
+    df.to_excel(output, index=False, engine='openpyxl')
+    output.seek(0)
+    return output
+
+def analyze_seo_score(title, description, keywords, category):
+    score = 0
+    feedback = []
+
+    # Title analysis
+    if len(title) >= 50 and len(title) <= 200:
+        score += 25
+    else:
+        feedback.append("Title should be between 50-200 characters")
+
+    # Description analysis
+    if len(description.split()) >= 50:
+        score += 25
+    else:
+        feedback.append("Description should have at least 50 words")
+
+    # Keywords analysis
+    if isinstance(keywords, list):
+        keyword_count = len(keywords)
+    else:
+        keyword_count = len(keywords.split(','))
+
+    if keyword_count >= 5:
+        score += 25
+    else:
+        feedback.append("Should have at least 5 keywords")
+
+    # Category analysis
+    if category:
+        score += 25
+    else:
+        feedback.append("Category is required")
+
+    if not feedback:
+        feedback.append("SEO optimization looks good! Consider adding high-volume keywords")
+
+    return {
+        'score': score,
+        'grade': 'A' if score >= 90 else 'B' if score >= 70 else 'C' if score >= 50 else 'D',
+        'feedback': feedback,
+        'improvements': []
+    }
 
 def scrape_product_data(url):
     """Scrape product dimensions and weight from e-commerce URLs"""
@@ -690,7 +992,7 @@ def scrape_generic(soup):
 def calculate_marketplace_shipping(weight, dimensions, marketplace='amazon'):
     """Calculate shipping charges for different marketplaces"""
     length = dimensions.get('length', 0)
-    width = dimensions.get('width', 0) 
+    width = dimensions.get('width', 0)
     height = dimensions.get('height', 0)
 
     # Calculate volumetric weight
@@ -776,413 +1078,142 @@ def calculate_meesho_shipping(weight, dimensions):
         'average': round(shipping * 0.9, 2)
     }
 
+# Routes
 @app.route('/')
 def index():
-    return render_template('index.html')
+    with open('templates/index.html', 'r') as f:
+        return f.read()
+
+@app.route('/api/configure-gemini', methods=['POST'])
+def configure_gemini():
+    try:
+        data = request.get_json()
+        api_key = data.get('apiKey')
+
+        if not api_key:
+            return jsonify({'error': 'API key is required'}), 400
+
+        if configure_gemini_api(api_key):
+            return jsonify({'success': True, 'message': 'Gemini API configured successfully'})
+        else:
+            return jsonify({'error': 'Failed to configure Gemini API'}), 500
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/generate-listing', methods=['POST'])
 def generate_listing():
     try:
-        print("Starting generate_listing...")
         data = request.get_json()
-        print(f"Received data keys: {data.keys() if data else 'No data'}")
-
-        if not genai_api_key:
-            print("Error: Gemini API key not configured")
-            return jsonify({'error': 'Gemini API key not configured'}), 400
-
-        # Get image data
         image_data = data.get('image')
-        if not image_data:
-            print("Error: No image provided")
-            return jsonify({'error': 'No image provided'}), 400
-
-        print("Processing image data...")
-        # Remove data URL prefix if present
-        if 'base64,' in image_data:
-            image_data = image_data.split('base64,')[1]
-
-        # Decode base64 image
-        try:
-            image_bytes = base64.b64decode(image_data)
-            image = Image.open(io.BytesIO(image_bytes))
-            print(f"Image loaded successfully: {image.size}")
-        except Exception as img_error:
-            print(f"Image processing error: {img_error}")
-            return jsonify({'error': f'Image processing failed: {str(img_error)}'}), 400
-
-        # Get additional product info
         product_info = data.get('productInfo', {})
-        product_name = product_info.get('name', '')
-        brand = product_info.get('brand', '')
-        dimensions = product_info.get('dimensions', '')
-        cost_price = product_info.get('costPrice', 0)
-        print(f"Product info: name={product_name}, brand={brand}")
 
-        # Create prompt for Gemini
-        prompt = f"""
-        Analyze this product image and generate 3 different e-commerce listing versions for Indian marketplaces (Amazon, Flipkart, Meesho).
-        Each version should have different copywriting styles and target different customer segments.
+        if not image_data:
+            return jsonify({'error': 'Image is required'}), 400
 
-        Additional product information:
-        - Product Name: {product_name}
-        - Brand: {brand}
-        - Dimensions: {dimensions}
-        - Cost Price: ₹{cost_price}
-
-        For HSN codes, please provide accurate 4-6 digit HSN codes based on the actual product category. Common examples:
-        - Electronics/Mobile phones: 8517 (18% GST)
-        - Toys and games: 9503 (12% GST for most toys, 18% for electronic toys)
-        - Clothing/Textiles: 6101-6302 (5-12% GST depending on material and type)
-        - Books/Printed material: 4901-4911 (0-12% GST)
-        - Furniture: 9403 (12% GST)
-        - Footwear: 6403-6405 (5-18% GST depending on material)
-        - Plastic items: 3926 (18% GST)
-        - Kitchen items/utensils: 7323 (18% GST)
-        - Cosmetics: 3303-3307 (18% GST)
-        - Sports goods: 9506 (18% GST)
-
-        Please analyze the product image carefully and assign the most appropriate HSN code based on the actual product category and material.
-
-        Please provide a JSON response with the following structure:
-        {{
-            "amazon": [
-                {{
-                    "version": 1,
-                    "style": "Professional & Feature-focused",
-                    "title": "Product title under 200 characters",
-                    "bulletPoints": ["3-5 bullet points under 250 chars each"],
-                    "description": "50-75 words description",
-                    "category": "Suggested category",
-                    "hsnCode": "Accurate 4-digit HSN code for this product category",
-                    "keywords": ["comma-separated SEO keywords"]
-                }},
-                {{
-                    "version": 2,
-                    "style": "Value & Benefits-focused",
-                    "title": "Different product title under 200 characters",
-                    "bulletPoints": ["3-5 different bullet points under 250 chars each"],
-                    "description": "Different 50-75 words description",
-                    "category": "Suggested category",
-                    "hsnCode": "HSN code preferably from 5% GST slab",
-                    "keywords": ["different comma-separated SEO keywords"]
-                }},
-                {{
-                    "version": 3,
-                    "style": "Emotional & Lifestyle-focused",
-                    "title": "Third product title under 200 characters",
-                    "bulletPoints": ["3-5 more bullet points under 250 chars each"],
-                    "description": "Third 50-75 words description",
-                    "category": "Suggested category",
-                    "hsnCode": "HSN code preferably from 5% GST slab",
-                    "keywords": ["third set of comma-separated SEO keywords"]
-                }}
-            ],
-            "flipkart": [
-                {{
-                    "version": 1,
-                    "style": "Specification-heavy",
-                    "title": "Flipkart-optimized title under 200 characters",
-                    "bulletPoints": ["3-5 spec-focused bullet points under 250 chars each"],
-                    "description": "Technical 50-75 words description",
-                    "category": "Suggested category",
-                    "hsnCode": "HSN code preferably from 5% GST slab",
-                    "keywords": ["technical SEO keywords"]
-                }},
-                {{
-                    "version": 2,
-                    "style": "Comparison & USP-focused",
-                    "title": "Comparison-based title under 200 characters",
-                    "bulletPoints": ["3-5 comparison bullet points under 250 chars each"],
-                    "description": "USP-focused 50-75 words description",
-                    "category": "Suggested category",
-                    "hsnCode": "HSN code preferably from 5% GST slab",
-                    "keywords": ["comparison SEO keywords"]
-                }},
-                {{
-                    "version": 3,
-                    "style": "Trendy & Modern",
-                    "title": "Trendy title under 200 characters",
-                    "bulletPoints": ["3-5 modern lifestyle bullet points under 250 chars each"],
-                    "description": "Modern 50-75 words description",
-                    "category": "Suggested category",
-                    "hsnCode": "HSN code preferably from 5% GST slab",
-                    "keywords": ["trendy SEO keywords"]
-                }}
-            ],
-            "meesho": [
-                {{
-                    "version": 1,
-                    "style": "Budget-conscious",
-                    "title": "Value-focused title under 200 characters",
-                    "bulletPoints": ["3-5 value-focused bullet points under 250 chars each"],
-                    "description": "Budget-friendly 50-75 words description",
-                    "category": "Suggested category",
-                    "hsnCode": "HSN code preferably from 5% GST slab",
-                    "keywords": ["budget SEO keywords"]
-                }},
-                {{
-                    "version": 2,
-                    "style": "Family-oriented",
-                    "title": "Family-friendly title under 200 characters",
-                    "bulletPoints": ["3-5 family-focused bullet points under 250 chars each"],
-                    "description": "Family-oriented 50-75 words description",
-                    "category": "Suggested category",
-                    "hsnCode": "HSN code preferably from 5% GST slab",
-                    "keywords": ["family SEO keywords"]
-                }},
-                {{
-                    "version": 3,
-                    "style": "Local & Regional",
-                    "title": "Regional appeal title under 200 characters",
-                    "bulletPoints": ["3-5 regional bullet points under 250 chars each"],
-                    "description": "Regional 50-75 words description",
-                    "category": "Suggested category",
-                    "hsnCode": "HSN code preferably from 5% GST slab",
-                    "keywords": ["regional SEO keywords"]
-                }}
-            ]
-        }}
-
-        Make each version unique with different copywriting approaches, target different customer personas, and use varied language styles suitable for Indian customers.
-
-        """
-
-        # Generate content with Gemini Vision
-        try:
-            print("Calling Gemini API...")
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            response = model.generate_content([prompt, image])
-            print("Gemini API call successful")
-        except Exception as api_error:
-            print(f"Gemini API error: {api_error}")
-            return jsonify({'error': f'Gemini API call failed: {str(api_error)}'}), 500
-
-        # Parse the response
-        try:
-            print("Parsing Gemini response...")
-            # Extract JSON from response
-            response_text = response.text
-            print(f"Raw response: {response_text[:200]}...")
-
-            if '```json' in response_text:
-                json_start = response_text.find('```json') + 7
-                json_end = response_text.find('```', json_start)
-                response_text = response_text[json_start:json_end]
-            elif '{' in response_text and '}' in response_text:
-                json_start = response_text.find('{')
-                json_end = response_text.rfind('}') + 1
-                response_text = response_text[json_start:json_end]
-
-            listing_data = json.loads(response_text)
-            print("JSON parsing successful")
-        except Exception as parse_error:
-            print(f"JSON parsing error: {parse_error}")
-            # Fallback if JSON parsing fails
-            listing_data = {
-                "amazon": [
-                    {
-                        "version": 1,
-                        "style": "Professional",
-                        "title": f"{brand} {product_name} - Premium Quality".strip() or "Premium Quality Product",
-                        "bulletPoints": ["High quality product", "Suitable for daily use", "Durable and long-lasting"],
-                        "description": "Quality product with excellent features and reliable performance for everyday use.",
-                        "category": "General",
-                        "hsnCode": "9999",
-                        "keywords": ["quality", "durable", "reliable"]
-                    },
-                    {
-                        "version": 2,
-                        "style": "Value-focused",
-                        "title": f"{brand} {product_name} - Best Value".strip() or "Best Value Product",
-                        "bulletPoints": ["Excellent value for money", "Cost-effective solution", "Great performance"],
-                        "description": "Get the best value with this cost-effective product that delivers great performance.",
-                        "category": "General",
-                        "hsnCode": "9999",
-                        "keywords": ["value", "affordable", "performance"]
-                    },
-                    {
-                        "version": 3,
-                        "style": "Lifestyle",
-                        "title": f"{brand} {product_name} - Lifestyle Choice".strip() or "Lifestyle Product",
-                        "bulletPoints": ["Perfect for modern lifestyle", "Stylish and functional", "Enhances daily routine"],
-                        "description": "Upgrade your lifestyle with this stylish and functional product for modern living.",
-                        "category": "General",
-                        "hsnCode": "9999",
-                        "keywords": ["lifestyle", "modern", "stylish"]
-                    }
-                ],
-                "flipkart": [
-                    {
-                        "version": 1,
-                        "style": "Technical",
-                        "title": f"{brand} {product_name} - Advanced Features".strip() or "Advanced Feature Product",
-                        "bulletPoints": ["Advanced technology", "Superior specifications", "Technical excellence"],
-                        "description": "Experience advanced technology with superior specifications and technical excellence.",
-                        "category": "General",
-                        "hsnCode": "9999",
-                        "keywords": ["advanced", "technology", "specifications"]
-                    },
-                    {
-                        "version": 2,
-                        "style": "Comparison",
-                        "title": f"{brand} {product_name} - Superior Choice".strip() or "Superior Choice Product",
-                        "bulletPoints": ["Better than competitors", "Proven superiority", "Top-rated choice"],
-                        "description": "Choose the superior option that outperforms competitors with proven quality.",
-                        "category": "General",
-                        "hsnCode": "9999",
-                        "keywords": ["superior", "better", "top-rated"]
-                    },
-                    {
-                        "version": 3,
-                        "style": "Trendy",
-                        "title": f"{brand} {product_name} - Trending Now".strip() or "Trending Product",
-                        "bulletPoints": ["Latest trend", "Popular choice", "Modern design"],
-                        "description": "Stay on-trend with this popular choice featuring modern design and latest features.",
-                        "category": "General",
-                        "hsnCode": "9999",
-                        "keywords": ["trending", "popular", "modern"]
-                    }
-                ],
-                "meesho": [
-                    {
-                        "version": 1,
-                        "style": "Budget",
-                        "title": f"{brand} {product_name} - Affordable Quality".strip() or "Affordable Quality Product",
-                        "bulletPoints": ["Budget-friendly price", "Great savings", "Affordable excellence"],
-                        "description": "Get quality at an affordable price with great savings and excellent value.",
-                        "category": "General",
-                        "hsnCode": "9999",
-                        "keywords": ["affordable", "budget", "savings"]
-                    },
-                    {
-                        "version": 2,
-                        "style": "Family",
-                        "title": f"{brand} {product_name} - Family Choice".strip() or "Family Choice Product",
-                        "bulletPoints": ["Perfect for families", "Safe and reliable", "Family-friendly design"],
-                        "description": "The perfect family choice with safe, reliable design for all family members.",
-                        "category": "General",
-                        "hsnCode": "9999",
-                        "keywords": ["family", "safe", "reliable"]
-                    },
-                    {
-                        "version": 3,
-                        "style": "Regional",
-                        "title": f"{brand} {product_name} - Local Favorite".strip() or "Local Favorite Product",
-                        "bulletPoints": ["Locally popular", "Regional favorite", "Community choice"],
-                        "description": "Join the community choice with this locally popular and regionally favored product.",
-                        "category": "General",
-                        "hsnCode": "9999",
-                        "keywords": ["local", "community", "popular"]
-                    }
-                ]
-            }
-            print("Using fallback listing data")
-
-        print("Returning successful response")
-        return jsonify({'success': True, 'data': listing_data})
+        listings = analyze_image_with_gemini(image_data, product_info)
+        return jsonify({'success': True, 'data': listings})
 
     except Exception as e:
-        print(f"Unexpected error in generate_listing: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-def analyze_market_prices(product_name, category):
-    """Analyze market prices for similar products"""
-    try:
-        # Simulate market analysis (you can integrate real APIs later)
-        base_prices = {
-            'electronics': {'min': 500, 'max': 5000, 'avg': 2000},
-            'clothing': {'min': 200, 'max': 2000, 'avg': 800},
-            'toys': {'min': 100, 'max': 1500, 'avg': 500},
-            'home': {'min': 300, 'max': 3000, 'avg': 1200}
-        }
-
-        category_key = next((k for k in base_prices.keys() if k in category.lower()), 'electronics')
-        price_range = base_prices[category_key]
-
-        return {
-            'market_min': price_range['min'],
-            'market_max': price_range['max'],
-            'market_average': price_range['avg'],
-            'recommended_range': {
-                'min': price_range['avg'] * 0.8,
-                'max': price_range['avg'] * 1.3
-            },
-            'competitive_analysis': 'Based on market data analysis'
-        }
-    except Exception as e:
-        return None
-
-@app.route('/api/analyze-market', methods=['POST'])
-def analyze_market():
+@app.route('/api/calculate-price', methods=['POST'])
+def calculate_price():
     try:
         data = request.get_json()
-        product_name = data.get('productName', '')
+        cost_price = data.get('costPrice')
+        profit_margin = data.get('profitMargin', 42.5)
+        hsn_code = data.get('hsnCode')
+        weight = data.get('weight', 0)
+        length = data.get('length', 0)
+        width = data.get('width', 0)
+        height = data.get('height', 0)
+
+        if not cost_price or not hsn_code:
+            return jsonify({'error': 'Cost price and HSN code are required'}), 400
+
+        pricing = calculate_marketplace_pricing(
+            float(cost_price), profit_margin, hsn_code,
+            float(weight), float(length), float(width), float(height)
+        )
+
+        return jsonify({'success': True, 'data': pricing})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/scrape-product', methods=['POST'])
+def scrape_product():
+    try:
+        data = request.get_json()
+        url = data.get('url')
+
+        if not url:
+            return jsonify({'error': 'URL is required'}), 400
+
+        product_data = scrape_product_info(url)
+
+        if product_data:
+            # Calculate shipping for all marketplaces
+            if product_data['weight'] or any(product_data['dimensions'].values()):
+                shipping_costs = calculate_marketplace_shipping(
+                    product_data['weight'],
+                    product_data['dimensions'],
+                    'all'
+                )
+                product_data['shipping'] = shipping_costs
+
+            return jsonify({'success': True, 'data': product_data})
+        else:
+            return jsonify({'error': 'Failed to scrape product data'}), 500
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/export/<format_type>', methods=['POST'])
+def export_listing(format_type):
+    try:
+        data = request.get_json()
+        listings = data.get('listing', [])
+        pricing = data.get('pricing', {})
+
+        if not listings:
+            return jsonify({'error': 'Listing data is required'}), 400
+
+        file_data = create_export_file(listings, pricing, format_type)
+
+        if format_type == 'flipkart':
+            return send_file(
+                io.BytesIO(file_data.getvalue().encode()),
+                mimetype='text/csv',
+                as_attachment=True,
+                download_name=f'{format_type}_listing.csv'
+            )
+        else:
+            return send_file(
+                file_data,
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                as_attachment=True,
+                download_name=f'{format_type}_listing.xlsx'
+            )
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/analyze-seo', methods=['POST'])
+def analyze_seo():
+    try:
+        data = request.get_json()
+        title = data.get('title', '')
+        description = data.get('description', '')
+        keywords = data.get('keywords', [])
         category = data.get('category', '')
 
-        analysis = analyze_market_prices(product_name, category)
-
-        if analysis:
-            return jsonify({'success': True, 'data': analysis})
-        else:
-            return jsonify({'error': 'Market analysis failed'}), 500
+        analysis = analyze_seo_score(title, description, keywords, category)
+        return jsonify({'success': True, 'data': analysis})
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-def analyze_seo_score(title, description, keywords, category):
-    """Calculate SEO score for product listing"""
-    score = 0
-    feedback = []
-
-    # Title analysis
-    if len(title) >= 50 and len(title) <= 200:
-        score += 20
-        feedback.append("✓ Title length is optimal")
-    else:
-        feedback.append("⚠ Title should be 50-200 characters")
-
-    # Description analysis
-    if len(description.split()) >= 50 and len(description.split()) <= 100:
-        score += 20
-        feedback.append("✓ Description length is optimal")
-    else:
-        feedback.append("⚠ Description should be 50-100 words")
-
-    # Keywords analysis
-    keyword_list = keywords if isinstance(keywords, list) else keywords.split(',')
-    if len(keyword_list) >= 5:
-        score += 20
-        feedback.append("✓ Good number of keywords")
-    else:
-        feedback.append("⚠ Add more keywords (minimum 5)")
-
-    # Category relevance
-    if category and len(category) > 0:
-        score += 20
-        feedback.append("✓ Category specified")
-    else:
-        feedback.append("⚠ Specify product category")
-
-    # Search volume simulation
-    high_volume_keywords = ['premium', 'quality', 'durable', 'bestseller', 'latest']
-    if any(kw.lower() in title.lower() for kw in high_volume_keywords):
-        score += 20
-        feedback.append("✓ Contains high-volume keywords")
-    else:
-        feedback.append("⚠ Consider adding high-volume keywords")
-
-    return {
-        'score': score,
-        'grade': 'A' if score >= 90 else 'B' if score >= 70 else 'C' if score >= 50 else 'D',
-        'feedback': feedback,
-        'improvements': []
-    }
-
-# Simple in-memory template storage (use database in production)
-saved_templates = {}
 
 @app.route('/api/save-template', methods=['POST'])
 def save_template():
@@ -1227,299 +1258,6 @@ def use_template():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/analyze-seo', methods=['POST'])
-def analyze_seo():
-    try:
-        data = request.get_json()
-        title = data.get('title', '')
-        description = data.get('description', '')
-        keywords = data.get('keywords', [])
-        category = data.get('category', '')
-
-        analysis = analyze_seo_score(title, description, keywords, category)
-        return jsonify({'success': True, 'data': analysis})
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/export/custom', methods=['POST'])
-def export_custom():
-    try:
-        data = request.get_json()
-        listing_data = data.get('listing', [])
-        export_config = data.get('config', {})
-        format_type = export_config.get('format', 'xlsx')
-
-        # Custom field mapping
-        field_mapping = export_config.get('fieldMapping', {})
-        include_analytics = export_config.get('includeAnalytics', False)
-        include_pricing = export_config.get('includePricing', True)
-
-        # Create customized export based on configuration
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=f'.{format_type}')
-        temp_file.close()
-
-        if format_type == 'json':
-            with open(temp_file.name, 'w', encoding='utf-8') as f:
-                json.dump(listing_data, f, indent=2, ensure_ascii=False)
-        elif format_type == 'txt':
-            with open(temp_file.name, 'w', encoding='utf-8') as f:
-                for item in listing_data:
-                    f.write(f"Title: {item.get('title', '')}\n")
-                    f.write(f"Description: {item.get('description', '')}\n")
-                    f.write("Bullet Points:\n")
-                    for bullet in item.get('bulletPoints', []):
-                        f.write(f"- {bullet}\n")
-                    f.write("\n" + "="*50 + "\n\n")
-
-        return send_file(temp_file.name, as_attachment=True,
-                        download_name=f'custom_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.{format_type}')
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/calculate-price', methods=['POST'])
-def calculate_price():
-    try:
-        data = request.get_json()
-
-        cost_price = float(data.get('costPrice', 0))
-        profit_margin = float(data.get('profitMargin', 42.5)) / 100
-        hsn_code = data.get('hsnCode', '9999')  # Get HSN code from request
-        marketplace = data.get('marketplace', 'amazon')
-
-        # Get GST rate based on HSN code
-        gst_rate, gst_description = get_gst_rate_from_hsn(hsn_code)
-
-        # Get weight and dimensions
-        weight = float(data.get('weight', 0))
-        length = float(data.get('length', 0))
-        width = float(data.get('width', 0))
-        height = float(data.get('height', 0))
-
-        dimensions = {'length': length, 'width': width, 'height': height}
-
-        # Calculate marketplace-specific shipping
-        shipping_data = calculate_marketplace_shipping(weight, dimensions, 'all')
-
-        # Platform commission rates
-        commission_rates = {
-            'amazon': 0.15,  # 15%
-            'flipkart': 0.12,  # 12%
-            'meesho': 0.08   # 8%
-        }
-
-        price_breakdowns = {}
-
-        for platform, shipping_info in shipping_data.items():
-            platform_commission = commission_rates.get(platform, 0.15)
-            avg_shipping = shipping_info['average']
-
-            # Price calculation
-            cost_with_gst = cost_price * (1 + gst_rate)
-            target_profit = cost_price * profit_margin
-
-            # Calculate selling price considering all costs
-            base_price = cost_with_gst + target_profit + avg_shipping
-            final_price = base_price / (1 - platform_commission)
-
-            mrp = final_price * 1.2  # 20% above selling price for MRP
-
-            price_breakdowns[platform] = {
-                'costPrice': cost_price,
-                'gst': round(cost_price * gst_rate, 2),
-                'gstRate': f"{gst_rate * 100}%",
-                'gstDescription': gst_description,
-                'hsnCode': hsn_code,
-                'targetProfit': round(target_profit, 2),
-                'shippingCost': round(avg_shipping, 2),
-                'shippingDetails': shipping_info,
-                'platformCommission': round(final_price * platform_commission, 2),
-                'platformCommissionRate': f"{platform_commission * 100}%",
-                'sellingPrice': round(final_price, 2),
-                'mrp': round(mrp, 2),
-                'weight': weight,
-                'volumetricWeight': round((length * width * height) / 5000, 2) if all([length, width, height]) else 0
-            }
-
-        return jsonify({'success': True, 'data': price_breakdowns})
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/export/<format>', methods=['POST'])
-def export_listing(format):
-    try:
-        data = request.get_json()
-        listing_versions = data.get('listing', [])
-        pricing = data.get('pricing', {})
-
-        print(f"Export format: {format}")
-        print(f"Listing versions: {len(listing_versions) if isinstance(listing_versions, list) else 'single listing'}")
-        print(f"Pricing data: {pricing}")
-
-        # Handle both single listing (manual mode) and multiple versions (AI mode)
-        if not isinstance(listing_versions, list):
-            listing_versions = [listing_versions]
-
-        if not listing_versions or not listing_versions[0]:
-            return jsonify({'error': 'No listing data provided'}), 400
-
-        # Create temporary file with proper extension
-        file_extension = 'xlsx' if format in ['amazon', 'meesho'] else 'csv'
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_extension}')
-        temp_file.close()  # Close the file so pandas can write to it
-
-        try:
-            if format == 'amazon':
-                # Amazon Flat File format with multiple versions
-                amazon_data = {
-                    'Version': [],
-                    'Style': [],
-                    'Product Title': [],
-                    'Product Description': [],
-                    'Bullet Point 1': [],
-                    'Bullet Point 2': [],
-                    'Bullet Point 3': [],
-                    'Bullet Point 4': [],
-                    'Bullet Point 5': [],
-                    'Standard Price': [],
-                    'Sale Price': [],
-                    'Keywords': [],
-                    'HSN Code': []
-                }
-
-                for version in listing_versions:
-                    amazon_data['Version'].append(version.get('version', 1))
-                    amazon_data['Style'].append(version.get('style', 'Standard'))
-                    amazon_data['Product Title'].append(version.get('title', ''))
-                    amazon_data['Product Description'].append(version.get('description', ''))
-                    bullets = version.get('bulletPoints', [])
-                    for i in range(5):
-                        amazon_data[f'Bullet Point {i+1}'].append(bullets[i] if i < len(bullets) else '')
-
-                    # Handle missing pricing data gracefully
-                    if pricing and pricing.get('amazon'):
-                        amazon_data['Standard Price'].append(pricing.get('amazon', {}).get('mrp', 0))
-                        amazon_data['Sale Price'].append(pricing.get('amazon', {}).get('sellingPrice', 0))
-                    else:
-                        amazon_data['Standard Price'].append(0)
-                        amazon_data['Sale Price'].append(0)
-
-                    keywords = version.get('keywords', [])
-                    amazon_data['Keywords'].append(', '.join(keywords) if isinstance(keywords, list) else str(keywords))
-                    amazon_data['HSN Code'].append(version.get('hsnCode', ''))
-
-                df = pd.DataFrame(amazon_data)
-                with pd.ExcelWriter(temp_file.name, engine='openpyxl') as writer:
-                    df.to_excel(writer, index=False, sheet_name='Amazon Listings')
-
-            elif format == 'flipkart':
-                # Flipkart CSV format with multiple versions
-                flipkart_data = {
-                    'Version': [],
-                    'Style': [],
-                    'Product Name': [],
-                    'Product Description': [],
-                    'Key Features': [],
-                    'MRP': [],
-                    'Selling Price': [],
-                    'Category': [],
-                    'HSN': [],
-                    'Keywords': []
-                }
-
-                for version in listing_versions:
-                    flipkart_data['Version'].append(version.get('version', 1))
-                    flipkart_data['Style'].append(version.get('style', 'Standard'))
-                    flipkart_data['Product Name'].append(version.get('title', ''))
-                    flipkart_data['Product Description'].append(version.get('description', ''))
-                    flipkart_data['Key Features'].append('; '.join(version.get('bulletPoints', [])))
-
-                    # Handle missing pricing data gracefully
-                    if pricing and pricing.get('flipkart'):
-                        flipkart_data['MRP'].append(pricing.get('flipkart', {}).get('mrp', 0))
-                        flipkart_data['Selling Price'].append(pricing.get('flipkart', {}).get('sellingPrice', 0))
-                    else:
-                        flipkart_data['MRP'].append(0)
-                        flipkart_data['Selling Price'].append(0)
-
-                    flipkart_data['Category'].append(version.get('category', ''))
-                    flipkart_data['HSN'].append(version.get('hsnCode', ''))
-                    keywords = version.get('keywords', [])
-                    flipkart_data['Keywords'].append(', '.join(keywords) if isinstance(keywords, list) else str(keywords))
-
-                df = pd.DataFrame(flipkart_data)
-                df.to_csv(temp_file.name, index=False, encoding='utf-8')
-
-            elif format == 'meesho':
-                # Meesho Excel format with multiple versions
-                meesho_data = {
-                    'Version': [],
-                    'Style': [],
-                    'Product Title': [],
-                    'Product Description': [],
-                    'Features': [],
-                    'MRP': [],
-                    'Supplier Price': [],
-                    'Category': [],
-                    'HSN Code': [],
-                    'Tags': []
-                }
-
-                for version in listing_versions:
-                    meesho_data['Version'].append(version.get('version', 1))
-                    meesho_data['Style'].append(version.get('style', 'Standard'))
-                    meesho_data['Product Title'].append(version.get('title', ''))
-                    meesho_data['Product Description'].append(version.get('description', ''))
-                    meesho_data['Features'].append('\n'.join(version.get('bulletPoints', [])))
-
-                    # Handle missing pricing data gracefully
-                    if pricing and pricing.get('meesho'):
-                        meesho_data['MRP'].append(pricing.get('meesho', {}).get('mrp', 0))
-                        meesho_data['Supplier Price'].append(pricing.get('meesho', {}).get('sellingPrice', 0))
-                    else:
-                        meesho_data['MRP'].append(0)
-                        meesho_data['Supplier Price'].append(0)
-
-                    meesho_data['Category'].append(version.get('category', ''))
-                    meesho_data['HSN Code'].append(version.get('hsnCode', ''))
-                    keywords = version.get('keywords', [])
-                    meesho_data['Tags'].append(', '.join(keywords) if isinstance(keywords, list) else str(keywords))
-
-                df = pd.DataFrame(meesho_data)
-                with pd.ExcelWriter(temp_file.name, engine='openpyxl') as writer:
-                    df.to_excel(writer, index=False, sheet_name='Meesho Listings')
-
-            print(f"File created successfully: {temp_file.name}")
-
-            # Verify file exists and has content
-            if not os.path.exists(temp_file.name):
-                return jsonify({'error': 'Failed to create export file'}), 500
-
-            file_size = os.path.getsize(temp_file.name)
-            if file_size == 0:
-                return jsonify({'error': 'Export file is empty'}), 500
-
-            print(f"File size: {file_size} bytes")
-
-            return send_file(temp_file.name, as_attachment=True, 
-                            download_name=f'product_listing_{format}_versions_{datetime.now().strftime("%Y%m%d_%H%M%S")}.{file_extension}',
-                            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' if file_extension == 'xlsx' else 'text/csv')
-
-        except Exception as export_error:
-            print(f"Export error: {export_error}")
-            # Clean up temp file on error
-            if os.path.exists(temp_file.name):
-                os.unlink(temp_file.name)
-            raise export_error
-
-    except Exception as e:
-        print(f"General export error: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': f'Export failed: {str(e)}'}), 500
-
 @app.route('/api/validate-hsn', methods=['POST'])
 def validate_hsn():
     try:
@@ -1550,49 +1288,6 @@ def validate_hsn():
             })
 
         return jsonify(response_data)
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/configure-gemini', methods=['POST'])
-def configure_gemini_api():
-    try:
-        data = request.get_json()
-        api_key = data.get('apiKey')
-
-        if not api_key:
-            return jsonify({'error': 'API key is required'}), 400
-
-        configure_gemini(api_key)
-        return jsonify({'success': True, 'message': 'Gemini API configured successfully'})
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/scrape-product', methods=['POST'])
-def scrape_product():
-    try:
-        data = request.get_json()
-        url = data.get('url')
-
-        if not url:
-            return jsonify({'error': 'URL is required'}), 400
-
-        product_data = scrape_product_data(url)
-
-        if product_data:
-            # Calculate shipping for all marketplaces
-            if product_data['weight'] or any(product_data['dimensions'].values()):
-                shipping_costs = calculate_marketplace_shipping(
-                    product_data['weight'], 
-                    product_data['dimensions'], 
-                    'all'
-                )
-                product_data['shipping'] = shipping_costs
-
-            return jsonify({'success': True, 'data': product_data})
-        else:
-            return jsonify({'error': 'Could not extract product data from URL'}), 400
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
