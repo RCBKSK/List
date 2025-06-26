@@ -1055,8 +1055,17 @@ def calculate_price():
     try:
         data = request.get_json()
         
-        cost_price = float(data.get('costPrice', 0))
-        profit_margin = float(data.get('profitMargin', 42.5)) / 100
+        # Helper function to safely convert to float
+        def safe_float(value, default=0):
+            if value is None or value == '' or value == 'null':
+                return default
+            try:
+                return float(value)
+            except (ValueError, TypeError):
+                return default
+        
+        cost_price = safe_float(data.get('costPrice', 0))
+        profit_margin = safe_float(data.get('profitMargin', 42.5)) / 100
         hsn_code = data.get('hsnCode', '9999')  # Get HSN code from request
         marketplace = data.get('marketplace', 'amazon')
         
@@ -1064,10 +1073,10 @@ def calculate_price():
         gst_rate, gst_description = get_gst_rate_from_hsn(hsn_code)
         
         # Get weight and dimensions
-        weight = float(data.get('weight', 0))
-        length = float(data.get('length', 0))
-        width = float(data.get('width', 0))
-        height = float(data.get('height', 0))
+        weight = safe_float(data.get('weight', 0))
+        length = safe_float(data.get('length', 0))
+        width = safe_float(data.get('width', 0))
+        height = safe_float(data.get('height', 0))
         
         dimensions = {'length': length, 'width': width, 'height': height}
         

@@ -270,19 +270,28 @@
                 // Use HSN code from manual listing if in manual mode, otherwise use default
                 const hsnCode = mode === 'manual' ? manualListing.hsnCode : '9999';
 
+                // Helper function to safely convert to number
+                const safeNumber = (value, defaultValue = 0) => {
+                    if (value === '' || value === null || value === undefined) {
+                        return defaultValue;
+                    }
+                    const num = parseFloat(value);
+                    return isNaN(num) ? defaultValue : num;
+                };
+
                 try {
                     const response = await fetch('/api/calculate-price', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            costPrice: productInfo.costPrice,
-                            weight: productInfo.weight,
-                            length: productInfo.length,
-                            width: productInfo.width,
-                            height: productInfo.height,
-                            profitMargin: productInfo.profitMargin,
-                            platformCommission: productInfo.platformCommission,
-                            hsnCode: hsnCode
+                            costPrice: safeNumber(productInfo.costPrice),
+                            weight: safeNumber(productInfo.weight),
+                            length: safeNumber(productInfo.length),
+                            width: safeNumber(productInfo.width),
+                            height: safeNumber(productInfo.height),
+                            profitMargin: safeNumber(productInfo.profitMargin, 42.5),
+                            platformCommission: safeNumber(productInfo.platformCommission, 15),
+                            hsnCode: hsnCode || '9999'
                         })
                     });
 
