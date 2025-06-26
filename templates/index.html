@@ -215,10 +215,19 @@
             };
 
             const exportListing = async (format) => {
-                const listingData = mode === 'ai' ? generatedListing : manualListing;
-                if (!listingData) {
-                    alert('Please generate or enter listing data first');
-                    return;
+                let listingData;
+                if (mode === 'ai') {
+                    if (!generatedListing) {
+                        alert('Please generate listing data first');
+                        return;
+                    }
+                    listingData = generatedListing[format] || generatedListing.amazon || [];
+                } else {
+                    if (!manualListing.title) {
+                        alert('Please enter listing data first');
+                        return;
+                    }
+                    listingData = [manualListing]; // Wrap manual listing in array for consistency
                 }
 
                 try {
@@ -564,19 +573,165 @@
                             )}
 
                             {/* Generated/Manual Listing */}
-                            {(generatedListing || (mode === 'manual' && manualListing.title)) && (
+                            {mode === 'ai' && generatedListing && (
+                                <div className="space-y-6">
+                                    {/* Amazon Versions */}
+                                    <div className="glass-effect p-6">
+                                        <h3 className="text-xl font-semibold text-white mb-4">🛒 Amazon Listings</h3>
+                                        {generatedListing.amazon?.map((version, index) => (
+                                            <div key={index} className="bg-white p-4 rounded-lg mb-4 space-y-3">
+                                                <div className="flex justify-between items-center">
+                                                    <h4 className="font-bold text-orange-600">Version {version.version}</h4>
+                                                    <span className="text-sm bg-orange-100 text-orange-800 px-2 py-1 rounded">
+                                                        {version.style}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Title:</h5>
+                                                    <p className="text-gray-600 text-sm">{version.title}</p>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Bullet Points:</h5>
+                                                    <ul className="list-disc list-inside text-gray-600 text-sm">
+                                                        {version.bulletPoints?.map((bullet, idx) => (
+                                                            bullet && <li key={idx}>{bullet}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Description:</h5>
+                                                    <p className="text-gray-600 text-sm">{version.description}</p>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                                    <div>
+                                                        <h5 className="font-semibold text-gray-800">Category:</h5>
+                                                        <p className="text-gray-600">{version.category}</p>
+                                                    </div>
+                                                    <div>
+                                                        <h5 className="font-semibold text-gray-800">HSN Code:</h5>
+                                                        <p className="text-gray-600">{version.hsnCode}</p>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Keywords:</h5>
+                                                    <p className="text-gray-600 text-sm">
+                                                        {Array.isArray(version.keywords) ? version.keywords.join(', ') : version.keywords}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Flipkart Versions */}
+                                    <div className="glass-effect p-6">
+                                        <h3 className="text-xl font-semibold text-white mb-4">🛍️ Flipkart Listings</h3>
+                                        {generatedListing.flipkart?.map((version, index) => (
+                                            <div key={index} className="bg-white p-4 rounded-lg mb-4 space-y-3">
+                                                <div className="flex justify-between items-center">
+                                                    <h4 className="font-bold text-blue-600">Version {version.version}</h4>
+                                                    <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                                                        {version.style}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Title:</h5>
+                                                    <p className="text-gray-600 text-sm">{version.title}</p>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Bullet Points:</h5>
+                                                    <ul className="list-disc list-inside text-gray-600 text-sm">
+                                                        {version.bulletPoints?.map((bullet, idx) => (
+                                                            bullet && <li key={idx}>{bullet}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Description:</h5>
+                                                    <p className="text-gray-600 text-sm">{version.description}</p>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                                    <div>
+                                                        <h5 className="font-semibold text-gray-800">Category:</h5>
+                                                        <p className="text-gray-600">{version.category}</p>
+                                                    </div>
+                                                    <div>
+                                                        <h5 className="font-semibold text-gray-800">HSN Code:</h5>
+                                                        <p className="text-gray-600">{version.hsnCode}</p>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Keywords:</h5>
+                                                    <p className="text-gray-600 text-sm">
+                                                        {Array.isArray(version.keywords) ? version.keywords.join(', ') : version.keywords}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Meesho Versions */}
+                                    <div className="glass-effect p-6">
+                                        <h3 className="text-xl font-semibold text-white mb-4">🏪 Meesho Listings</h3>
+                                        {generatedListing.meesho?.map((version, index) => (
+                                            <div key={index} className="bg-white p-4 rounded-lg mb-4 space-y-3">
+                                                <div className="flex justify-between items-center">
+                                                    <h4 className="font-bold text-pink-600">Version {version.version}</h4>
+                                                    <span className="text-sm bg-pink-100 text-pink-800 px-2 py-1 rounded">
+                                                        {version.style}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Title:</h5>
+                                                    <p className="text-gray-600 text-sm">{version.title}</p>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Bullet Points:</h5>
+                                                    <ul className="list-disc list-inside text-gray-600 text-sm">
+                                                        {version.bulletPoints?.map((bullet, idx) => (
+                                                            bullet && <li key={idx}>{bullet}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Description:</h5>
+                                                    <p className="text-gray-600 text-sm">{version.description}</p>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                                    <div>
+                                                        <h5 className="font-semibold text-gray-800">Category:</h5>
+                                                        <p className="text-gray-600">{version.category}</p>
+                                                    </div>
+                                                    <div>
+                                                        <h5 className="font-semibold text-gray-800">HSN Code:</h5>
+                                                        <p className="text-gray-600">{version.hsnCode}</p>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h5 className="font-semibold text-gray-800">Keywords:</h5>
+                                                    <p className="text-gray-600 text-sm">
+                                                        {Array.isArray(version.keywords) ? version.keywords.join(', ') : version.keywords}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Manual Listing */}
+                            {mode === 'manual' && manualListing.title && (
                                 <div className="glass-effect p-6">
-                                    <h3 className="text-xl font-semibold text-white mb-4">📋 Product Listing</h3>
+                                    <h3 className="text-xl font-semibold text-white mb-4">📋 Manual Product Listing</h3>
                                     <div className="bg-white p-4 rounded-lg space-y-4">
                                         <div>
                                             <h4 className="font-semibold text-gray-800">Title:</h4>
-                                            <p className="text-gray-600">{mode === 'ai' ? generatedListing?.title : manualListing.title}</p>
+                                            <p className="text-gray-600">{manualListing.title}</p>
                                         </div>
 
                                         <div>
                                             <h4 className="font-semibold text-gray-800">Bullet Points:</h4>
                                             <ul className="list-disc list-inside text-gray-600">
-                                                {(mode === 'ai' ? generatedListing?.bulletPoints : manualListing.bulletPoints)?.map((bullet, index) => (
+                                                {manualListing.bulletPoints?.map((bullet, index) => (
                                                     bullet && <li key={index}>{bullet}</li>
                                                 ))}
                                             </ul>
@@ -584,27 +739,24 @@
 
                                         <div>
                                             <h4 className="font-semibold text-gray-800">Description:</h4>
-                                            <p className="text-gray-600">{mode === 'ai' ? generatedListing?.description : manualListing.description}</p>
+                                            <p className="text-gray-600">{manualListing.description}</p>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <h4 className="font-semibold text-gray-800">Category:</h4>
-                                                <p className="text-gray-600">{mode === 'ai' ? generatedListing?.category : manualListing.category}</p>
+                                                <p className="text-gray-600">{manualListing.category}</p>
                                             </div>
                                             <div>
                                                 <h4 className="font-semibold text-gray-800">HSN Code:</h4>
-                                                <p className="text-gray-600">{mode === 'ai' ? generatedListing?.hsnCode : manualListing.hsnCode}</p>
+                                                <p className="text-gray-600">{manualListing.hsnCode}</p>
                                             </div>
                                         </div>
 
                                         <div>
                                             <h4 className="font-semibold text-gray-800">Keywords:</h4>
                                             <p className="text-gray-600">
-                                                {mode === 'ai' 
-                                                    ? (Array.isArray(generatedListing?.keywords) ? generatedListing.keywords.join(', ') : (generatedListing?.keywords || ''))
-                                                    : (Array.isArray(manualListing.keywords) ? manualListing.keywords.join(', ') : '')
-                                                }
+                                                {Array.isArray(manualListing.keywords) ? manualListing.keywords.join(', ') : ''}
                                             </p>
                                         </div>
                                     </div>

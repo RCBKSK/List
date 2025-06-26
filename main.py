@@ -568,7 +568,8 @@ def generate_listing():
         
         # Create prompt for Gemini
         prompt = f"""
-        Analyze this product image and generate an e-commerce listing for Indian marketplaces (Amazon, Flipkart, Meesho).
+        Analyze this product image and generate 3 different e-commerce listing versions for Indian marketplaces (Amazon, Flipkart, Meesho).
+        Each version should have different copywriting styles and target different customer segments.
         
         Additional product information:
         - Product Name: {product_name}
@@ -578,15 +579,105 @@ def generate_listing():
         
         Please provide a JSON response with the following structure:
         {{
-            "title": "Product title under 200 characters",
-            "bulletPoints": ["3-5 bullet points under 250 chars each"],
-            "description": "50-75 words description",
-            "category": "Suggested category",
-            "hsnCode": "HSN code preferably from 5% GST slab",
-            "keywords": ["comma-separated SEO keywords"]
+            "amazon": [
+                {{
+                    "version": 1,
+                    "style": "Professional & Feature-focused",
+                    "title": "Product title under 200 characters",
+                    "bulletPoints": ["3-5 bullet points under 250 chars each"],
+                    "description": "50-75 words description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["comma-separated SEO keywords"]
+                }},
+                {{
+                    "version": 2,
+                    "style": "Value & Benefits-focused",
+                    "title": "Different product title under 200 characters",
+                    "bulletPoints": ["3-5 different bullet points under 250 chars each"],
+                    "description": "Different 50-75 words description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["different comma-separated SEO keywords"]
+                }},
+                {{
+                    "version": 3,
+                    "style": "Emotional & Lifestyle-focused",
+                    "title": "Third product title under 200 characters",
+                    "bulletPoints": ["3-5 more bullet points under 250 chars each"],
+                    "description": "Third 50-75 words description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["third set of comma-separated SEO keywords"]
+                }}
+            ],
+            "flipkart": [
+                {{
+                    "version": 1,
+                    "style": "Specification-heavy",
+                    "title": "Flipkart-optimized title under 200 characters",
+                    "bulletPoints": ["3-5 spec-focused bullet points under 250 chars each"],
+                    "description": "Technical 50-75 words description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["technical SEO keywords"]
+                }},
+                {{
+                    "version": 2,
+                    "style": "Comparison & USP-focused",
+                    "title": "Comparison-based title under 200 characters",
+                    "bulletPoints": ["3-5 comparison bullet points under 250 chars each"],
+                    "description": "USP-focused 50-75 words description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["comparison SEO keywords"]
+                }},
+                {{
+                    "version": 3,
+                    "style": "Trendy & Modern",
+                    "title": "Trendy title under 200 characters",
+                    "bulletPoints": ["3-5 modern lifestyle bullet points under 250 chars each"],
+                    "description": "Modern 50-75 words description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["trendy SEO keywords"]
+                }}
+            ],
+            "meesho": [
+                {{
+                    "version": 1,
+                    "style": "Budget-conscious",
+                    "title": "Value-focused title under 200 characters",
+                    "bulletPoints": ["3-5 value-focused bullet points under 250 chars each"],
+                    "description": "Budget-friendly 50-75 words description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["budget SEO keywords"]
+                }},
+                {{
+                    "version": 2,
+                    "style": "Family-oriented",
+                    "title": "Family-friendly title under 200 characters",
+                    "bulletPoints": ["3-5 family-focused bullet points under 250 chars each"],
+                    "description": "Family-oriented 50-75 words description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["family SEO keywords"]
+                }},
+                {{
+                    "version": 3,
+                    "style": "Local & Regional",
+                    "title": "Regional appeal title under 200 characters",
+                    "bulletPoints": ["3-5 regional bullet points under 250 chars each"],
+                    "description": "Regional 50-75 words description",
+                    "category": "Suggested category",
+                    "hsnCode": "HSN code preferably from 5% GST slab",
+                    "keywords": ["regional SEO keywords"]
+                }}
+            ]
         }}
         
-        Make the content appealing for Indian customers, include relevant features, benefits, and specifications.
+        Make each version unique with different copywriting approaches, target different customer personas, and use varied language styles suitable for Indian customers.
         """
         
         # Generate content with Gemini Vision
@@ -621,16 +712,102 @@ def generate_listing():
             print(f"JSON parsing error: {parse_error}")
             # Fallback if JSON parsing fails
             listing_data = {
-                "title": f"{brand} {product_name}".strip() or "Product Title",
-                "bulletPoints": [
-                    "High quality product",
-                    "Suitable for daily use",
-                    "Durable and long-lasting"
+                "amazon": [
+                    {
+                        "version": 1,
+                        "style": "Professional",
+                        "title": f"{brand} {product_name} - Premium Quality".strip() or "Premium Quality Product",
+                        "bulletPoints": ["High quality product", "Suitable for daily use", "Durable and long-lasting"],
+                        "description": "Quality product with excellent features and reliable performance for everyday use.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["quality", "durable", "reliable"]
+                    },
+                    {
+                        "version": 2,
+                        "style": "Value-focused",
+                        "title": f"{brand} {product_name} - Best Value".strip() or "Best Value Product",
+                        "bulletPoints": ["Excellent value for money", "Cost-effective solution", "Great performance"],
+                        "description": "Get the best value with this cost-effective product that delivers great performance.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["value", "affordable", "performance"]
+                    },
+                    {
+                        "version": 3,
+                        "style": "Lifestyle",
+                        "title": f"{brand} {product_name} - Lifestyle Choice".strip() or "Lifestyle Product",
+                        "bulletPoints": ["Perfect for modern lifestyle", "Stylish and functional", "Enhances daily routine"],
+                        "description": "Upgrade your lifestyle with this stylish and functional product for modern living.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["lifestyle", "modern", "stylish"]
+                    }
                 ],
-                "description": "Quality product with excellent features and reliable performance for everyday use.",
-                "category": "General",
-                "hsnCode": "9999",
-                "keywords": ["quality", "durable", "reliable"]
+                "flipkart": [
+                    {
+                        "version": 1,
+                        "style": "Technical",
+                        "title": f"{brand} {product_name} - Advanced Features".strip() or "Advanced Feature Product",
+                        "bulletPoints": ["Advanced technology", "Superior specifications", "Technical excellence"],
+                        "description": "Experience advanced technology with superior specifications and technical excellence.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["advanced", "technology", "specifications"]
+                    },
+                    {
+                        "version": 2,
+                        "style": "Comparison",
+                        "title": f"{brand} {product_name} - Superior Choice".strip() or "Superior Choice Product",
+                        "bulletPoints": ["Better than competitors", "Proven superiority", "Top-rated choice"],
+                        "description": "Choose the superior option that outperforms competitors with proven quality.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["superior", "better", "top-rated"]
+                    },
+                    {
+                        "version": 3,
+                        "style": "Trendy",
+                        "title": f"{brand} {product_name} - Trending Now".strip() or "Trending Product",
+                        "bulletPoints": ["Latest trend", "Popular choice", "Modern design"],
+                        "description": "Stay on-trend with this popular choice featuring modern design and latest features.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["trending", "popular", "modern"]
+                    }
+                ],
+                "meesho": [
+                    {
+                        "version": 1,
+                        "style": "Budget",
+                        "title": f"{brand} {product_name} - Affordable Quality".strip() or "Affordable Quality Product",
+                        "bulletPoints": ["Budget-friendly price", "Great savings", "Affordable excellence"],
+                        "description": "Get quality at an affordable price with great savings and excellent value.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["affordable", "budget", "savings"]
+                    },
+                    {
+                        "version": 2,
+                        "style": "Family",
+                        "title": f"{brand} {product_name} - Family Choice".strip() or "Family Choice Product",
+                        "bulletPoints": ["Perfect for families", "Safe and reliable", "Family-friendly design"],
+                        "description": "The perfect family choice with safe, reliable design for all family members.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["family", "safe", "reliable"]
+                    },
+                    {
+                        "version": 3,
+                        "style": "Regional",
+                        "title": f"{brand} {product_name} - Local Favorite".strip() or "Local Favorite Product",
+                        "bulletPoints": ["Locally popular", "Regional favorite", "Community choice"],
+                        "description": "Join the community choice with this locally popular and regionally favored product.",
+                        "category": "General",
+                        "hsnCode": "9999",
+                        "keywords": ["local", "community", "popular"]
+                    }
+                ]
             }
             print("Using fallback listing data")
         
@@ -710,60 +887,115 @@ def calculate_price():
 def export_listing(format):
     try:
         data = request.get_json()
-        listing = data.get('listing', {})
+        listing_versions = data.get('listing', [])
         pricing = data.get('pricing', {})
+        
+        # Handle both single listing (manual mode) and multiple versions (AI mode)
+        if not isinstance(listing_versions, list):
+            listing_versions = [listing_versions]
         
         # Create temporary file
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=f'.{format}')
         
         if format == 'amazon':
-            # Amazon Flat File format
+            # Amazon Flat File format with multiple versions
             amazon_data = {
-                'Product Title': [listing.get('title', '')],
-                'Product Description': [listing.get('description', '')],
-                'Bullet Point 1': [listing.get('bulletPoints', [''])[0] if listing.get('bulletPoints') else ''],
-                'Bullet Point 2': [listing.get('bulletPoints', ['', ''])[1] if len(listing.get('bulletPoints', [])) > 1 else ''],
-                'Bullet Point 3': [listing.get('bulletPoints', ['', '', ''])[2] if len(listing.get('bulletPoints', [])) > 2 else ''],
-                'Standard Price': [pricing.get('mrp', 0)],
-                'Sale Price': [pricing.get('sellingPrice', 0)],
-                'Keywords': [', '.join(listing.get('keywords', []))],
-                'HSN Code': [listing.get('hsnCode', '')]
+                'Version': [],
+                'Style': [],
+                'Product Title': [],
+                'Product Description': [],
+                'Bullet Point 1': [],
+                'Bullet Point 2': [],
+                'Bullet Point 3': [],
+                'Bullet Point 4': [],
+                'Bullet Point 5': [],
+                'Standard Price': [],
+                'Sale Price': [],
+                'Keywords': [],
+                'HSN Code': []
             }
+            
+            for version in listing_versions:
+                amazon_data['Version'].append(version.get('version', 1))
+                amazon_data['Style'].append(version.get('style', 'Standard'))
+                amazon_data['Product Title'].append(version.get('title', ''))
+                amazon_data['Product Description'].append(version.get('description', ''))
+                bullets = version.get('bulletPoints', [])
+                for i in range(5):
+                    amazon_data[f'Bullet Point {i+1}'].append(bullets[i] if i < len(bullets) else '')
+                amazon_data['Standard Price'].append(pricing.get('amazon', {}).get('mrp', pricing.get('mrp', 0)))
+                amazon_data['Sale Price'].append(pricing.get('amazon', {}).get('sellingPrice', pricing.get('sellingPrice', 0)))
+                keywords = version.get('keywords', [])
+                amazon_data['Keywords'].append(', '.join(keywords) if isinstance(keywords, list) else str(keywords))
+                amazon_data['HSN Code'].append(version.get('hsnCode', ''))
+            
             df = pd.DataFrame(amazon_data)
             df.to_excel(temp_file.name, index=False)
             
         elif format == 'flipkart':
-            # Flipkart CSV format
+            # Flipkart CSV format with multiple versions
             flipkart_data = {
-                'Product Name': [listing.get('title', '')],
-                'Product Description': [listing.get('description', '')],
-                'Key Features': ['; '.join(listing.get('bulletPoints', []))],
-                'MRP': [pricing.get('mrp', 0)],
-                'Selling Price': [pricing.get('sellingPrice', 0)],
-                'Category': [listing.get('category', '')],
-                'HSN': [listing.get('hsnCode', '')],
-                'Keywords': [', '.join(listing.get('keywords', []))]
+                'Version': [],
+                'Style': [],
+                'Product Name': [],
+                'Product Description': [],
+                'Key Features': [],
+                'MRP': [],
+                'Selling Price': [],
+                'Category': [],
+                'HSN': [],
+                'Keywords': []
             }
+            
+            for version in listing_versions:
+                flipkart_data['Version'].append(version.get('version', 1))
+                flipkart_data['Style'].append(version.get('style', 'Standard'))
+                flipkart_data['Product Name'].append(version.get('title', ''))
+                flipkart_data['Product Description'].append(version.get('description', ''))
+                flipkart_data['Key Features'].append('; '.join(version.get('bulletPoints', [])))
+                flipkart_data['MRP'].append(pricing.get('flipkart', {}).get('mrp', pricing.get('mrp', 0)))
+                flipkart_data['Selling Price'].append(pricing.get('flipkart', {}).get('sellingPrice', pricing.get('sellingPrice', 0)))
+                flipkart_data['Category'].append(version.get('category', ''))
+                flipkart_data['HSN'].append(version.get('hsnCode', ''))
+                keywords = version.get('keywords', [])
+                flipkart_data['Keywords'].append(', '.join(keywords) if isinstance(keywords, list) else str(keywords))
+            
             df = pd.DataFrame(flipkart_data)
             df.to_csv(temp_file.name, index=False)
             
         elif format == 'meesho':
-            # Meesho Excel format
+            # Meesho Excel format with multiple versions
             meesho_data = {
-                'Product Title': [listing.get('title', '')],
-                'Product Description': [listing.get('description', '')],
-                'Features': ['\n'.join(listing.get('bulletPoints', []))],
-                'MRP': [pricing.get('mrp', 0)],
-                'Supplier Price': [pricing.get('sellingPrice', 0)],
-                'Category': [listing.get('category', '')],
-                'HSN Code': [listing.get('hsnCode', '')],
-                'Tags': [', '.join(listing.get('keywords', []))]
+                'Version': [],
+                'Style': [],
+                'Product Title': [],
+                'Product Description': [],
+                'Features': [],
+                'MRP': [],
+                'Supplier Price': [],
+                'Category': [],
+                'HSN Code': [],
+                'Tags': []
             }
+            
+            for version in listing_versions:
+                meesho_data['Version'].append(version.get('version', 1))
+                meesho_data['Style'].append(version.get('style', 'Standard'))
+                meesho_data['Product Title'].append(version.get('title', ''))
+                meesho_data['Product Description'].append(version.get('description', ''))
+                meesho_data['Features'].append('\n'.join(version.get('bulletPoints', [])))
+                meesho_data['MRP'].append(pricing.get('meesho', {}).get('mrp', pricing.get('mrp', 0)))
+                meesho_data['Supplier Price'].append(pricing.get('meesho', {}).get('sellingPrice', pricing.get('sellingPrice', 0)))
+                meesho_data['Category'].append(version.get('category', ''))
+                meesho_data['HSN Code'].append(version.get('hsnCode', ''))
+                keywords = version.get('keywords', [])
+                meesho_data['Tags'].append(', '.join(keywords) if isinstance(keywords, list) else str(keywords))
+            
             df = pd.DataFrame(meesho_data)
             df.to_excel(temp_file.name, index=False)
         
         return send_file(temp_file.name, as_attachment=True, 
-                        download_name=f'product_listing_{format}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.{"xlsx" if format in ["amazon", "meesho"] else "csv"}')
+                        download_name=f'product_listing_{format}_versions_{datetime.now().strftime("%Y%m%d_%H%M%S")}.{"xlsx" if format in ["amazon", "meesho"] else "csv"}')
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
